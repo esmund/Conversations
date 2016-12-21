@@ -12,8 +12,8 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
+import android.widget.CheckBox;
 import android.widget.ImageView;
-import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.wefika.flowlayout.FlowLayout;
@@ -23,19 +23,20 @@ import java.util.List;
 import java.util.concurrent.RejectedExecutionException;
 
 import eu.siacs.conversations.R;
+import eu.siacs.conversations.entities.Contact;
 import eu.siacs.conversations.entities.ListItem;
 import eu.siacs.conversations.ui.XmppActivity;
 import eu.siacs.conversations.utils.UIHelper;
-import eu.siacs.conversations.xmpp.jid.Jid;
 
 public class ListItemAdapter extends ArrayAdapter<ListItem> {
 
 	protected XmppActivity activity;
 	protected boolean showDynamicTags = false;
+    private int defaultTextColor = 0;
 	private View.OnClickListener onTagTvClick = new View.OnClickListener() {
 		@Override
 		public void onClick(View view) {
-			if (view instanceof  TextView && mOnTagClickedListener != null) {
+            if (view instanceof  TextView && mOnTagClickedListener != null) {
 				TextView tv = (TextView) view;
 				final String tag = tv.getText().toString();
 				mOnTagClickedListener.onTagClicked(tag);
@@ -63,6 +64,9 @@ public class ListItemAdapter extends ArrayAdapter<ListItem> {
 		TextView tvJid = (TextView) view.findViewById(R.id.contact_jid);
 		ImageView picture = (ImageView) view.findViewById(R.id.contact_photo);
 		FlowLayout tagLayout = (FlowLayout) view.findViewById(R.id.tags);
+        if(defaultTextColor == 0){
+            defaultTextColor = tvName.getCurrentTextColor();
+        }
 
 		List<ListItem.Tag> tags = item.getTags(activity);
 		if (tags.size() == 0 || !this.showDynamicTags) {
@@ -87,6 +91,18 @@ public class ListItemAdapter extends ArrayAdapter<ListItem> {
 		}
 		tvName.setText(item.getDisplayName());
 		loadAvatar(item,picture);
+
+        if(((Contact)getItem(position)).getIsChecked()) {
+            ((CheckBox) view.findViewById(R.id.selected_checkbox)).setChecked(true);
+            tvName.setTextColor(0xFF3366BB);
+            tvJid.setTextColor(0xFF3366BB);
+        }else {
+            ((CheckBox) view.findViewById(R.id.selected_checkbox)).setChecked(false);
+            tvName.setTextColor(defaultTextColor);
+            tvJid.setTextColor(defaultTextColor);
+
+        }
+
 		return view;
 	}
 

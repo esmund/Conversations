@@ -121,7 +121,6 @@ public class ConversationFragment extends Fragment implements EditMessage.Keyboa
 
 		@Override
 		public void onScrollStateChanged(AbsListView view, int scrollState) {
-			// TODO Auto-generated method stub
 
 		}
 

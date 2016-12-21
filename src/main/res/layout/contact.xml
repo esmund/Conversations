@@ -6,11 +6,20 @@
                 android:background="?android:attr/activatedBackgroundIndicator"
                 android:padding="8dp">
 
+
+    <CheckBox
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/selected_checkbox"
+        android:clickable="false"
+        android:focusable="false"/>
+
     <com.makeramen.roundedimageview.RoundedImageView
         android:id="@+id/contact_photo"
         android:layout_width="48dp"
         android:layout_height="48dp"
-        android:layout_alignParentLeft="true"
+        android:layout_alignParentLeft="false"
+        android:layout_toRightOf="@id/selected_checkbox"
         android:scaleType="centerCrop"
         android:src="@drawable/ic_profile"
         app:riv_corner_radius="2dp" />
@@ -54,6 +63,7 @@
             android:typeface="monospace"
             android:fontFamily="monospace"
             android:visibility="gone" />
+
     </LinearLayout>
 
 </RelativeLayout>

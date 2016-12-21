@@ -13,6 +13,10 @@ public interface ListItem extends Comparable<ListItem> {
 
 	Jid getJid();
 
+    //boolean getIsChecked();
+
+    //void setChecked(boolean isChecked);
+
 	List<Tag> getTags(Context context);
 
 	final class Tag {

@@ -1,6 +1,7 @@
 package eu.siacs.conversations.ui;
 
 import android.annotation.SuppressLint;
+import android.annotation.TargetApi;
 import android.app.ActionBar;
 import android.app.AlertDialog;
 import android.app.FragmentTransaction;
@@ -250,6 +251,8 @@ public class ConversationActivity extends XmppActivity
 
 				return new EnhancedListView.Undoable() {
 
+                    //TODO: targetapi?
+                    @TargetApi(21)
 					@Override
 					public void undo() {
 						listAdapter.insert(swipedConversation, position);
@@ -322,7 +325,6 @@ public class ConversationActivity extends XmppActivity
 
 				@Override
 				public void onPanelSlide(View arg0, float arg1) {
-					// TODO Auto-generated method stub
 
 				}
 			});

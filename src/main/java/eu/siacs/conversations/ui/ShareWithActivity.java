@@ -63,7 +63,6 @@ public class ShareWithActivity extends XmppActivity implements XmppConnectionSer
 
 		@Override
 		public void userInputRequried(PendingIntent pi, Message object) {
-			// TODO Auto-generated method stub
 
 		}
 

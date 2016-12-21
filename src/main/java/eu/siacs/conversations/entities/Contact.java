@@ -51,7 +51,8 @@ public class Contact implements ListItem, Blockable {
 	protected Account account;
 	protected Avatar avatar;
 
-	private boolean mActive = false;
+    private boolean mActive = false;
+    private boolean isChecked = false;
 	private long mLastseen = 0;
 	private String mLastPresence = null;
 
@@ -135,6 +136,14 @@ public class Contact implements ListItem, Blockable {
 			return null;
 		}
 	}
+
+    public void setChecked (boolean isChecked){
+        this.isChecked = isChecked;
+    }
+
+    public boolean getIsChecked(){
+        return this.isChecked;
+    }
 
 	public String getProfilePhoto() {
 		return this.photoUri;
