@@ -8,6 +8,8 @@ import android.text.style.ReplacementSpan;
 
 import eu.siacs.conversations.ui.StartConversationActivity;
 
+import static android.R.color.white;
+
 /**
  * Created by esm on 20/12/16.
  */
@@ -17,16 +19,30 @@ public class RoundedBackgroundSpan extends ReplacementSpan{
     private static int CORNER_RADIUS = 20;
     private int backgroundColor = 0;
     private int textColor = 0;
+    private Context context;
+    private boolean isHighlighted;
+    private boolean editedSpan;
+    private int spanEnd;
+    private int spanStart;
 
     public RoundedBackgroundSpan(Context context) {
         super();
-        backgroundColor = context.getResources().getColor(R.color.link_text_material_light);
+        this.context = context;
+        //backgroundColor = context.getResources().getColor(R.color.link_text_material_light);
+        backgroundColor = white;
         textColor = ((StartConversationActivity)context).getPrimaryTextColor();
+        isHighlighted = false;
+        editedSpan = false;
+
     }
 
     @Override
     public void draw(Canvas canvas, CharSequence text, int start, int end, float x, int top, int y, int bottom, Paint paint) {
-        RectF rect = new RectF(x, top, x + measureText(paint, text, start, end), bottom);
+        RectF rect;
+        rect = new RectF(x, top, x + measureText(paint, text, start, end), bottom);
+        this.spanEnd = end;
+        this.spanStart = start;
+
         paint.setColor(backgroundColor);
         canvas.drawRoundRect(rect, CORNER_RADIUS, CORNER_RADIUS, paint);
         paint.setColor(textColor);
@@ -39,9 +55,29 @@ public class RoundedBackgroundSpan extends ReplacementSpan{
     }
 
     public void paintText(){
-        this.backgroundColor = 80000000;
+
+        if(!isHighlighted) {
+            this.backgroundColor = context.getResources().getColor(R.color.link_text_material_dark);
+        }
+        else {
+            this.backgroundColor = white;
+        }
+
+        isHighlighted = !isHighlighted;
     }
+
+    public int getSpanEnd(){
+        return this.spanEnd;
+    }
+    public int getSpanStart(){
+        return this.spanStart;
+    }
+    public String getString(){
+        return this.getString();
+    }
+
     private float measureText(Paint paint, CharSequence text, int start, int end) {
         return paint.measureText(text, start, end);
     }
+
 }

@@ -68,12 +68,15 @@ import com.google.zxing.integration.android.IntentResult;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import eu.siacs.conversations.Config;
+import eu.siacs.conversations.ContactSpan;
 import eu.siacs.conversations.R;
 import eu.siacs.conversations.RoundedBackgroundSpan;
+import eu.siacs.conversations.ToContactEditText;
 import eu.siacs.conversations.entities.Account;
 import eu.siacs.conversations.entities.Bookmark;
 import eu.siacs.conversations.entities.Contact;
@@ -89,7 +92,10 @@ import eu.siacs.conversations.xmpp.XmppConnection;
 import eu.siacs.conversations.xmpp.jid.InvalidJidException;
 import eu.siacs.conversations.xmpp.jid.Jid;
 
+import static eu.siacs.conversations.R.string.delete;
+
 public class StartConversationActivity extends XmppActivity implements OnRosterUpdate, OnUpdateBlocklist {
+    private final CharSequence delimiter = ",";
 
     public int conference_context_id;
     public int contact_context_id;
@@ -106,7 +112,7 @@ public class StartConversationActivity extends XmppActivity implements OnRosterU
     private List<String> mKnownConferenceHosts;
     private Invite mPendingInvite = null;
     private EditText mSearchEditText;
-    private EditText toContactEditText;
+    private ToContactEditText toContactEditText;
     private AtomicBoolean mRequestedContactsPermission = new AtomicBoolean(false);
     private final int REQUEST_SYNC_CONTACTS = 0x3b28cf;
     private final int REQUEST_CREATE_CONFERENCE = 0x3b39da;
@@ -114,10 +120,17 @@ public class StartConversationActivity extends XmppActivity implements OnRosterU
     private boolean textIsUserInput = true;
     private StringBuilder currentSearchString = new StringBuilder();
     private ArrayList<RoundedBackgroundSpan> spanArrayList = new ArrayList();
+    private ArrayList<Contact> clickedContactsList = new ArrayList();
+    private ArrayList<View> clickedViewList = new ArrayList<>();
+    private ArrayList<ContactSpan> contactSpanArrayList = new ArrayList<>();
     private char lastDelChar;
+    private int indexOfSelectedSpan = -1;
     final ArrayList<String> selectedContacts = new ArrayList<>();
+    private final int INDEX_OF_LIST_CONTACT = 1;
+    private final int INDEX_OF_SPAN = 2;
 
     private boolean isHighlighted = false;
+    private boolean delimiterDeleted = false;
 
 
     private MenuItem.OnActionExpandListener mOnActionExpandListener = new MenuItem.OnActionExpandListener() {
@@ -145,7 +158,9 @@ public class StartConversationActivity extends XmppActivity implements OnRosterU
             filter(null);
             return true;
         }
+
     };
+
     private boolean mHideOfflineContacts = false;
     private TabListener mTabListener = new TabListener() {
 
@@ -174,6 +189,7 @@ public class StartConversationActivity extends XmppActivity implements OnRosterU
             onTabChanged();
         }
     };
+
     private TextWatcher mSearchTextWatcher = new TextWatcher() {
 
         @Override
@@ -182,7 +198,8 @@ public class StartConversationActivity extends XmppActivity implements OnRosterU
             if(textIsUserInput) {
                 //Do not search when textview is changed programmatically
                 filter(currentSearchString.toString());
-                Log.d("debug","filter contact for "+currentSearchString.toString());
+                //Log.d("debug","filter contact for "+currentSearchString.toString());
+                Log.d("debug","filter = ");
             }
             else {
                 textIsUserInput = true;
@@ -192,28 +209,36 @@ public class StartConversationActivity extends XmppActivity implements OnRosterU
         @Override
         public void beforeTextChanged(CharSequence s, int start, int count,
                                       int after) {
-            if(count > 0){
+            if(count > 0 && textIsUserInput){
                 lastDelChar = s.charAt(s.length()-count);
+                //Log.d("debug","lastDelChar = "+lastDelChar);
             }
         }
 
         @Override
         public void onTextChanged(CharSequence s, int start, int before, int count) {
 
-            if (textIsUserInput) {
+            if (textIsUserInput && s.toString().length() != 0) {
                 //add the new chars into currentSearchString
                 currentSearchString.append(s.subSequence(start, start + count).toString());
                 if (before > 0) {
 
-                    if(lastDelChar == ',') {
-                        Log.d("debug", "deleting contact");
+                    if(lastDelChar == delimiter.charAt(0)) {
+//                        Spannable spanText = toContactEditText.getText();
+//                        String toCheck = spanText.subSequence(spanText.getSpanStart(this), spanText.getSpanEnd(this)).toString();
+//                        indexOfSelectedSpan=selectedContacts.indexOf((toCheck));
                         //get the previous position
-                        spanArrayList.get(spanArrayList.size()-1).paintText();
-                        isHighlighted = true;
+                        indexOfSelectedSpan = spanArrayList.size()-1;
+                        spanArrayList.get(indexOfSelectedSpan).paintText();
+                        delimiterDeleted = true;
+                    }
+                    else {
+                        delimiterDeleted = false;
                     }
 
 
                     if (currentSearchString.length() - before > 0) {
+                        textIsUserInput = false;
                         //delete last backspaced char from currentSearchString
                         currentSearchString.delete(currentSearchString.length() - before, currentSearchString.length());
                     } else {
@@ -321,8 +346,7 @@ public class StartConversationActivity extends XmppActivity implements OnRosterU
 //            actionBar.addTab(mContactsTab);
 //            actionBar.addTab(mConferencesTab);
 //
-        toContactEditText= (EditText)findViewById(R.id.to_contact_field);
-
+        toContactEditText= (ToContactEditText)findViewById(R.id.to_contact_field);
         mViewPager = (ViewPager) findViewById(R.id.start_conversation_view_pager);
 
         //mViewPager.setOnPageChangeListener(mOnPageChangeListener);
@@ -335,6 +359,23 @@ public class StartConversationActivity extends XmppActivity implements OnRosterU
         this.mHideOfflineContacts = getPreferences().getBoolean("hide_offline", false);
 
 
+    }
+
+
+    @Override
+    public boolean onNavigateUp() {
+        Iterator<Contact> contactIterator = clickedContactsList.iterator();
+        Iterator<View> checkBoxIterator = clickedViewList.iterator();
+        while(contactIterator.hasNext()){
+            contactIterator.next().setChecked(false);
+        }
+        while(checkBoxIterator.hasNext()){
+            ((CheckBox)checkBoxIterator.next().findViewById(R.id.selected_checkbox)).setChecked(false);
+        }
+
+        Log.d("debug","onNaviup"+clickedContactsList.size());
+
+        return super.onNavigateUp();
     }
 
     @Override
@@ -420,7 +461,7 @@ public class StartConversationActivity extends XmppActivity implements OnRosterU
         builder.setTitle(R.string.action_delete_contact);
         builder.setMessage(getString(R.string.remove_contact_text,
                 contact.getJid()));
-        builder.setPositiveButton(R.string.delete, new OnClickListener() {
+        builder.setPositiveButton(delete, new OnClickListener() {
 
             @Override
             public void onClick(DialogInterface dialog, int which) {
@@ -440,7 +481,7 @@ public class StartConversationActivity extends XmppActivity implements OnRosterU
         builder.setTitle(R.string.delete_bookmark);
         builder.setMessage(getString(R.string.remove_bookmark_text,
                 bookmark.getJid()));
-        builder.setPositiveButton(R.string.delete, new OnClickListener() {
+        builder.setPositiveButton(delete, new OnClickListener() {
 
             @Override
             public void onClick(DialogInterface dialog, int which) {
@@ -645,6 +686,26 @@ public class StartConversationActivity extends XmppActivity implements OnRosterU
         }
     }
 
+    private int getIndex(String stringOfIndex, int toGet){
+        switch (toGet) {
+
+            case INDEX_OF_LIST_CONTACT:
+                clickedContactsList.indexOf(stringOfIndex);
+            case INDEX_OF_SPAN:
+                String text = toContactEditText.getText().toString();
+                String[] splitStringArr = text.split(",");
+                int indexOfSpan = 0;
+                for (String contactStr:splitStringArr) {
+                    Log.d("debug","checking "+contactStr+" for "+stringOfIndex);
+                    if(contactStr.equals(stringOfIndex)){
+                        return indexOfSpan;
+                    }
+                    indexOfSpan++;
+                }
+        }
+        return -1;
+    }
+
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.start_conversation, menu);
@@ -653,8 +714,8 @@ public class StartConversationActivity extends XmppActivity implements OnRosterU
         MenuItem menuHideOffline = menu.findItem(R.id.action_hide_offline);
         menuHideOffline.setChecked(this.mHideOfflineContacts);
 
-       // mMenuSearchView = menu.findItem(R.id.action_search);
-       /// mMenuSearchView.setOnActionExpandListener(mOnActionExpandListener);
+        // mMenuSearchView = menu.findItem(R.id.action_search);
+        /// mMenuSearchView.setOnActionExpandListener(mOnActionExpandListener);
 //        View mSearchView = mMenuSearchView.getActionView();
 //        mSearchEditText = (EditText) mSearchView
 //                .findViewById(R.id.search_field);
@@ -662,8 +723,15 @@ public class StartConversationActivity extends XmppActivity implements OnRosterU
 //        mSearchEditText.addTextChangedListener(mSearchTextWatcher);
 //        mSearchEditText.setOnEditorActionListener(mSearchDone);
 
-            toContactEditText.addTextChangedListener(mSearchTextWatcher);
+        toContactEditText.addTextChangedListener(mSearchTextWatcher);
         //toContactEditText.setOnEditorActionListener(mSearchDone);
+//        toContactEditText.setOnEditorActionListener(new TextView.OnEditorActionListener() {
+//            @Override
+//            public boolean onEditorAction(TextView textView, int i, KeyEvent keyEvent) {
+//                Log.d("debug","oneditoraction");
+//                return false;
+//            }
+//        });
 
 
 
@@ -706,32 +774,64 @@ public class StartConversationActivity extends XmppActivity implements OnRosterU
         return super.onOptionsItemSelected(item);
     }
 
-    @Override
-    public boolean dispatchKeyEvent(KeyEvent event) {
-        if(event.getKeyCode() == KeyEvent.KEYCODE_DEL && spanArrayList.size() > 0){
-            if(isHighlighted){
-                Log.d("debug",spanArrayList.size()+" span array size");
-                //move cursor
-                spanArrayList.remove(spanArrayList.size()-1);
-                isHighlighted = false;
-                //TODO: does not work
-                return true;
-            }
-        }
-        return super.dispatchKeyEvent(event);
-    }
+//    @Override
+//    public boolean dispatchKeyEvent(KeyEvent event) {
+//        if(event.getKeyCode() == KeyEvent.KEYCODE_DEL && spanArrayList.size() > 0){
+//            if(isHighlighted){
+//                Log.d("debug",spanArrayList.size()+" span array size");
+//                //move cursor
+//                spanArrayList.remove(spanArrayList.size()-1);
+//                isHighlighted = false;
+//                //TODO: does not work
+//                return true;
+//            }
+//        }
+//        return super.dispatchKeyEvent(event);
+//    }
 
     @Override
     public boolean onKeyUp(int keyCode, KeyEvent event) {
-
-
+        //textIsUserInput = true;
         if(keyCode == KeyEvent.KEYCODE_DEL && spanArrayList.size() > 0) {
             if(isHighlighted){
-                Log.d("debug",spanArrayList.size()+" span array size");
-                //move cursor
-                spanArrayList.remove(spanArrayList.size()-1);
+                if(indexOfSelectedSpan != -1) {
+                    //Log.d("debug","deleting span "+indexOfSelectedSpan);
+                    deleteSpan(indexOfSelectedSpan);
+                    contactSpanArrayList.get(indexOfSelectedSpan).clearSpan();
+                    contactSpanArrayList.remove(indexOfSelectedSpan);
+
+                    clickedContactsList.get(indexOfSelectedSpan).setChecked(false);
+                    ((CheckBox)clickedViewList.get(indexOfSelectedSpan).findViewById(R.id.selected_checkbox)).setChecked(false);
+
+                    ((TextView) clickedViewList.get(indexOfSelectedSpan).findViewById(R.id.contact_display_name)).setTextColor(getPrimaryTextColor());
+                    ((TextView) clickedViewList.get(indexOfSelectedSpan).findViewById(R.id.contact_jid)).setTextColor(getPrimaryTextColor());
+                    //move cursor
+                    spanArrayList.remove(indexOfSelectedSpan);
+                    clickedViewList.remove(indexOfSelectedSpan);
+                    selectedContacts.remove(indexOfSelectedSpan);
+                    clickedContactsList.remove(indexOfSelectedSpan);
+                }
+//                }else {
+//                    clickedContactsList.get(clickedViewList.size()-1).setChecked(false);
+//                    clickedViewList.get(clickedViewList.size()-1).setChecked(false);
+//                    spanArrayList.remove(clickedViewList.size()-1);
+//                    clickedViewList.remove(clickedViewList.size()-1);
+//                }
+
+                isHighlighted = false;
+                indexOfSelectedSpan = -1;
+            }
+
+            if(delimiterDeleted){
+                isHighlighted = true;
+                toContactEditText.overrideDel = true;
+                delimiterDeleted= false;
+                //Log.d("debug","overrideDel true at delimiterDeleted");
+            }
+            else {
                 isHighlighted = false;
             }
+            return true;
         }
 
         if (keyCode == KeyEvent.KEYCODE_SEARCH && !event.isLongPress()) {
@@ -1065,6 +1165,131 @@ public class StartConversationActivity extends XmppActivity implements OnRosterU
         //mConferenceAdapter.notifyDataSetChanged();
     }
 
+    private void populateEdittext(final String text){
+        //Log.d("debug","populate this text"+text);
+        textIsUserInput = false;
+        toContactEditText.setText("", TextView.BufferType.SPANNABLE);
+        spanArrayList.clear();
+        String[] splitStringArr = text.split(",");
+        for (String contactStr:splitStringArr) {
+
+            final RoundedBackgroundSpan bgSpan = new RoundedBackgroundSpan(StartConversationActivity.this);
+            spanArrayList.add(bgSpan);
+            SpannableStringBuilder spanStringBuilder = new SpannableStringBuilder(contactStr);
+
+            spanStringBuilder.setSpan(bgSpan, 0, contactStr.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+
+            StyleSpan boldSpan = new StyleSpan(Typeface.BOLD);
+            spanStringBuilder.setSpan(boldSpan,0,contactStr.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            //spanStringBuilder.setSpan(new ForegroundColorSpan(Color.BLUE),0,contactStr.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+
+            spanStringBuilder.setSpan(new ClickableSpan() {
+                @Override
+                public void onClick(View view) {
+                    textIsUserInput = false;
+                    EditText spanTextView= (EditText) view;
+                    Spannable spanText = spanTextView.getText();
+                    Editable editable = toContactEditText.getText();
+                    String toCheck = spanText.subSequence(spanText.getSpanStart(this), spanText.getSpanEnd(this)).toString();
+
+                    if(isHighlighted && indexOfSelectedSpan!=selectedContacts.indexOf((toCheck)) && indexOfSelectedSpan != -1){
+                        textIsUserInput = false;
+                        editable.insert(spanText.getSpanEnd(spanArrayList.get(indexOfSelectedSpan)),",");
+                        //clear the previous span first
+                        spanArrayList.get(indexOfSelectedSpan).paintText();
+                    }
+                    //if removing current highlighted span
+                    if(isHighlighted && indexOfSelectedSpan == selectedContacts.indexOf(toCheck)){
+                        textIsUserInput = false;
+                        editable.insert(spanText.getSpanEnd(this),",");
+                        if(indexOfSelectedSpan != -1) {
+                        }
+                        toContactEditText.setCursorVisible(true);
+                        isHighlighted = false;
+                        toContactEditText.overrideDel = false;
+
+                        //Log.d("debug","overrideDel false at onClick");
+                    }else{
+                        //if clicking on current span
+                        textIsUserInput = false;
+                        editable.delete(spanText.getSpanEnd(this),spanText.getSpanEnd(this)+1);
+                        toContactEditText.setCursorVisible(false);
+                        isHighlighted = true;
+                        toContactEditText.overrideDel = true;
+                        //Log.d("debug","overrideDel true at onClick");
+                        //Log.d("debug","delete ,");
+                    }
+
+                    //Log.d("debug","indexOfSelectedSpan ="+indexOfSelectedSpan+" clicked index = "+selectedContacts.indexOf(toCheck));
+                    indexOfSelectedSpan = selectedContacts.indexOf((toCheck));
+                    spanArrayList.get(indexOfSelectedSpan).paintText();
+
+                    // Log.d("debug","span from"+spanText.getSpanStart(spanArrayList.get(indexOfSelectedSpan))+" to "+spanText.getSpanEnd(spanArrayList.get(indexOfSelectedSpan)));
+                    //Forcefully refresh edittext to allow redraw of new color
+                    if(delimiterDeleted){
+                        //editable.append(',');
+                        delimiterDeleted = false;
+                        //Log.d("debug","delimiter added");
+                    }
+                    textIsUserInput = false;
+                    //Log.d("debug","textIsUserInput at onclick = "+textIsUserInput);
+                    toContactEditText.setText(editable,TextView.BufferType.SPANNABLE);
+
+
+
+
+                }
+
+                @Override
+                public void updateDrawState(TextPaint ds) {
+                    ds.setUnderlineText(false);
+                    super.updateDrawState(ds);
+                }
+
+
+            },0,contactStr.length(),Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+
+            if(spanStringBuilder.toString().length() > 0) {
+                textIsUserInput = false;
+                toContactEditText.append(spanStringBuilder);
+                textIsUserInput = false;
+                toContactEditText.append(",");
+            }
+        }
+
+        toContactEditText.setMovementMethod(LinkMovementMethod.getInstance());
+    }
+
+    private void deleteSpan (int spanToDel){
+        Editable editableText =toContactEditText.getText();
+        //delete causes textchange ?
+        textIsUserInput = false;
+        editableText.delete(spanArrayList.get(spanToDel).getSpanStart(),spanArrayList.get(spanToDel).getSpanEnd());
+        textIsUserInput = false;
+        toContactEditText.setText(editableText);
+        toContactEditText.setMovementMethod(LinkMovementMethod.getInstance());
+
+        isHighlighted=false;
+        toContactEditText.setCursorVisible(true);
+        toContactEditText.overrideDel = false;
+        //Log.d("debug","overrideDel false at deleteSpan");
+    }
+
+    private void deleteSpan (int spanToDel,int delChars){
+        Editable editableText =toContactEditText.getText();
+        //delete causes textchange ?
+        textIsUserInput = false;
+        editableText.delete(spanArrayList.get(spanToDel).getSpanStart(),spanArrayList.get(spanToDel).getSpanEnd()+delChars);
+        textIsUserInput = false;
+        toContactEditText.setText(editableText);
+        toContactEditText.setMovementMethod(LinkMovementMethod.getInstance());
+
+        isHighlighted=false;
+        toContactEditText.setCursorVisible(true);
+        toContactEditText.overrideDel = false;
+        //Log.d("debug","overrideDel false at deleteSpan");
+    }
+
     private void onTabChanged() {
         invalidateOptionsMenu();
     }
@@ -1155,48 +1380,87 @@ public class StartConversationActivity extends XmppActivity implements OnRosterU
 
                         @Override
                         //@TargetApi(Build.VERSION_CODES.LOLLIPOP)
-                            public void onItemClick(AdapterView<?> arg0, View arg1,
+                        public void onItemClick(AdapterView<?> arg0, View arg1,
                                                 int position, long arg3) {
 
                             StringBuilder currentText = new StringBuilder(toContactEditText.getText().toString());
                             SpannableStringBuilder spanStringBuilder = new SpannableStringBuilder();
                             CheckBox selectorChkbox = (CheckBox)(arg1.findViewById(R.id.selected_checkbox));
                             RoundedBackgroundSpan bgSpan = new RoundedBackgroundSpan(StartConversationActivity.this);
+                            Contact currentContact = (Contact) arg0.getAdapter().getItem(position);
+                            int indexOfCheckedListItem = clickedViewList.indexOf(arg1);
                             boolean hasTypedChars = true;
 
-                            spanArrayList.add(bgSpan);
-
                             if(selectorChkbox.isChecked()){
+                                if(isHighlighted) {
+                                    if(indexOfSelectedSpan == indexOfCheckedListItem) {
+                                        Log.d("debug","clicked listitem == span");
+                                        deleteSpan(indexOfSelectedSpan);
+                                        indexOfSelectedSpan = -1;
+                                    }
+                                    else {
+                                        deleteSpan(indexOfCheckedListItem,1);
+                                        if(indexOfSelectedSpan > indexOfCheckedListItem){
+                                            indexOfSelectedSpan --;
+                                        }
+                                        ((CheckBox) arg1.findViewById(R.id.selected_checkbox)).setChecked(false);
+                                        ((TextView) arg1.findViewById(R.id.contact_display_name)).setTextColor(getPrimaryTextColor());
+                                        ((TextView) arg1.findViewById(R.id.contact_jid)).setTextColor(getPrimaryTextColor());
+                                        //move cursor
+                                        spanArrayList.remove(indexOfCheckedListItem);
+                                        clickedViewList.remove(indexOfCheckedListItem);
+                                        selectedContacts.remove(indexOfCheckedListItem);
+                                        clickedContactsList.remove(indexOfCheckedListItem);
+                                        isHighlighted = true;
+                                        Log.d("debug","index of span is now "+indexOfSelectedSpan);
 
-                                ((TextView)arg1.findViewById(R.id.contact_display_name)).setTextColor(getPrimaryTextColor());
-                                ((TextView)arg1.findViewById(R.id.contact_jid)).setTextColor(getPrimaryTextColor());
-                                //workaround for making view clickable
-                                selectorChkbox.setFocusable(false);
+                                    }
+                                }else {
+                                    ((TextView) arg1.findViewById(R.id.contact_display_name)).setTextColor(getPrimaryTextColor());
+                                    ((TextView) arg1.findViewById(R.id.contact_jid)).setTextColor(getPrimaryTextColor());
+                                    //workaround for making view clickable
+                                    selectorChkbox.setFocusable(false);
 
-                                //get the string to remove from edittext view
-                                Jid jidToRemove = ((ListItem) arg0.getAdapter().getItem(position)).getJid();
-                                //removing string from var
-                                selectedContacts.remove(jidToRemove.toString());
-                                int indexOfContact = currentText.indexOf(jidToRemove+"");
-                                //removing string from view with len +1(',')
-                                currentText.delete(indexOfContact,indexOfContact+jidToRemove.toString().length()+1);
-                                textIsUserInput = false;
+                                    //get the string to remove from edittext view
+                                    Jid jidToRemove = ((ListItem) arg0.getAdapter().getItem(position)).getJid();
+                                    //removing string from var
+                                    selectedContacts.remove(jidToRemove.toString());
+                                    int indexOfContact = currentText.indexOf(jidToRemove + "");
+                                    textIsUserInput = false;
+                                    //removing string from view with len +1(',')
+                                    currentText.delete(indexOfContact, indexOfContact + jidToRemove.toString().length() + 1);
 
-                                spanStringBuilder.replace(0,spanStringBuilder.length(),"");
-                                spanStringBuilder.append(currentText);
-                                //change span to seperate columns
-                                spanStringBuilder.setSpan(bgSpan, 0, currentText.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-
-                                //toContactEditText.setText((Spanned)(toContactEditText.getText().delete(indexOfContact ,jidToRemove.toString().length()+1)));
-                                toContactEditText.setText(spanStringBuilder);
-                                toContactEditText.setSelection(toContactEditText.length());
-                                //mContactsAdapter.notifyDataSetChanged();
+                                    spanStringBuilder.replace(0, spanStringBuilder.length(), "");
+                                    spanStringBuilder.append(currentText);
+                                    //change span to seperate columns
+                                    //spanStringBuilder.setSpan(bgSpan, 0, currentText.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                                    populateEdittext(spanStringBuilder.toString());
+                                    //toContactEditText.setText((Spanned)(toContactEditText.getText().delete(indexOfContact ,jidToRemove.toString().length()+1)));
+                                    //toContactEditText.setText(spanStringBuilder);
+                                    toContactEditText.setSelection(toContactEditText.length());
+                                    //mContactsAdapter.notifyDataSetChanged();
+                                }
 
                             }
                             else {
-                                //TODO: make contact selected into "object"
-                                textIsUserInput = false;
+
+                                if(isHighlighted){
+                                    deleteSpan(indexOfSelectedSpan);
+                                    clickedContactsList.get(indexOfSelectedSpan).setChecked(false);
+                                    ((TextView) clickedViewList.get(indexOfSelectedSpan).findViewById(R.id.contact_display_name)).setTextColor(getPrimaryTextColor());
+                                    ((TextView) clickedViewList.get(indexOfSelectedSpan).findViewById(R.id.contact_jid)).setTextColor(getPrimaryTextColor());
+                                    ((CheckBox) clickedViewList.get(indexOfSelectedSpan).findViewById(R.id.selected_checkbox)).setChecked(false);
+                                    spanArrayList.remove(indexOfSelectedSpan);
+                                    clickedViewList.remove(indexOfSelectedSpan);
+                                    selectedContacts.remove(indexOfSelectedSpan);
+                                    clickedContactsList.remove(indexOfSelectedSpan);
+                                    indexOfSelectedSpan = -1;
+                                    //workaround for making view clickable
+                                    selectorChkbox.setFocusable(false);
+                                }
+
                                 selectedContacts.add(((ListItem) arg0.getAdapter().getItem(position)).getJid().toString());
+                                contactSpanArrayList.add(new ContactSpan(currentContact,arg1));
 
 
                                 if (currentSearchString.length() > 0) {
@@ -1209,11 +1473,12 @@ public class StartConversationActivity extends XmppActivity implements OnRosterU
                                     temp = temp + ((ListItem) arg0.getAdapter().getItem(position)).getJid();
 
                                     spanStringBuilder.append(temp);
-                                    spanStringBuilder.setSpan(bgSpan, 0, temp.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                                    //spanStringBuilder.setSpan(bgSpan, 0, temp.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                                     textIsUserInput = false;
-                                    spanStringBuilder.append(",");
+                                    spanStringBuilder.append(delimiter);
                                     //set the new string after appending new contact id
-                                    toContactEditText.setText(spanStringBuilder);
+                                    populateEdittext(spanStringBuilder.toString());
+                                    //toContactEditText.setText(spanStringBuilder);
                                     //spanStringBuilder.delete(spanStringBuilder.length()-1,spanStringBuilder.length());
                                     //filter("");
                                     hasTypedChars = true;
@@ -1221,61 +1486,65 @@ public class StartConversationActivity extends XmppActivity implements OnRosterU
 
                                 } else {
 
-
                                     spanStringBuilder.append(((ListItem) arg0.getAdapter().getItem(position)).getJid() + "");
-                                    spanStringBuilder.setSpan(bgSpan, 0, (((ListItem) arg0.getAdapter().getItem(position)).getJid()).toString().length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-
-
-                                    StyleSpan boldSpan = new StyleSpan(Typeface.BOLD);
-                                    spanStringBuilder.setSpan(boldSpan,0,(((ListItem) arg0.getAdapter().getItem(position)).getJid()).toString().length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-
-                                    spanStringBuilder.setSpan(new ClickableSpan() {
-                                        @Override
-                                        public void onClick(View view) {
-                                            EditText spanTextView= (EditText) view;
-                                            Spannable spanText = spanTextView.getText();
-                                            String toCheck = spanText.subSequence(spanText.getSpanStart(this), spanText.getSpanEnd(this)).toString();
-                                            Log.d("debug","index of onClick is "+ selectedContacts.indexOf(toCheck));
-                                            spanArrayList.get(selectedContacts.indexOf(toCheck)).paintText();
-                                            Log.d("debug", "onClick " + toCheck);
-                                            //Log.d("debug","on click "+ spanText.getText());
-                                        }
-
-                                        @Override
-                                        public void updateDrawState(TextPaint ds) {
-                                            super.updateDrawState(ds);
-                                            ds.setUnderlineText(false);
-                                        }
-
-
-                                    },0,(((ListItem) arg0.getAdapter().getItem(position)).getJid()).toString().length(),Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-                                    //TODO: qn
-
-                                    toContactEditText.setMovementMethod(LinkMovementMethod.getInstance());
-
-//                                    spanStringBuilder.append(between);
-//                                    if (between.length() == 0) between = " if ";
-//                                    String thisTag = "tag ";
-//                                    spanStringBuilder.append(thisTag);
-
-                                    //toContactEditText.append(((ListItem) arg0.getAdapter().getItem(position)).getJid()+",");
-                                    toContactEditText.append(spanStringBuilder);
-                                    textIsUserInput = false;
-                                    toContactEditText.append(",");
+//                                    spanStringBuilder.setSpan(bgSpan, 0, (((ListItem) arg0.getAdapter().getItem(position)).getJid()).toString().length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+//
+//
+//                                    StyleSpan boldSpan = new StyleSpan(Typeface.BOLD);
+//                                    spanStringBuilder.setSpan(boldSpan,0,(((ListItem) arg0.getAdapter().getItem(position)).getJid()).toString().length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+//
+//                                    spanStringBuilder.setSpan(new ClickableSpan() {
+//                                        @Override
+//                                        public void onClick(View view) {
+//                                            EditText spanTextView= (EditText) view;
+//                                            Spannable spanText = spanTextView.getText();
+//                                            String toCheck = spanText.subSequence(spanText.getSpanStart(this), spanText.getSpanEnd(this)).toString();
+//                                            Log.d("debug","selected span at position "+ selectedContacts.indexOf(toCheck));
+//                                            indexOfSelectedSpan=selectedContacts.indexOf((toCheck));
+//                                            spanArrayList.get(indexOfSelectedSpan).paintText();
+////                                            Log.d("debug","cursor is at "+ toContactEditText.getSelectionStart());
+////                                            toContactEditText.setSelection(toContactEditText.getSelectionStart()+toCheck.length()+1);
+////                                            Log.d("debug","cursor is at "+ toContactEditText.getSelectionStart());
+//                                            //Log.d("debug", "onClick " + toCheck);
+//                                            //Log.d("debug","on click "+ spanText.getText());
+//                                        }
+//
+//                                        @Override
+//                                        public void updateDrawState(TextPaint ds) {
+//                                            super.updateDrawState(ds);
+//                                            ds.setUnderlineText(false);
+//                                        }
+//
+//
+//                                    },0,(((ListItem) arg0.getAdapter().getItem(position)).getJid()).toString().length(),Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+//
+//                                    toContactEditText.setMovementMethod(LinkMovementMethod.getInstance());
+                                    Log.d("userinput","onclick listfrag before populate"+textIsUserInput);
+                                    populateEdittext(toContactEditText.getText()+spanStringBuilder.toString());
+                                    //toContactEditText.append(spanStringBuilder);
                                 }
 
                                 //clear current search string
                                 currentSearchString.replace(0, currentSearchString.length(), "");
                                 spanStringBuilder.replace(0, spanStringBuilder.length(), "");
                                 //set cursor to the end of edit text
+                                Log.d("userinput","onclick listfrag before setselection"+textIsUserInput);
                                 toContactEditText.setSelection(toContactEditText.length());
+
+                                Log.d("userinput","onclick listfrag end "+textIsUserInput);
 
                                 ((TextView) arg1.findViewById(R.id.contact_display_name)).setTextColor(0xFF3366BB);
                                 ((TextView) arg1.findViewById(R.id.contact_jid)).setTextColor(0xFF3366BB);
                                 hideKeyboard();
                             }
                             selectorChkbox.setChecked(!selectorChkbox.isChecked());
-                            ((Contact) arg0.getAdapter().getItem(position)).setChecked(!((Contact) arg0.getAdapter().getItem(position)).getIsChecked());
+                            if(!clickedContactsList.contains(currentContact)) {
+                                clickedContactsList.add(currentContact);
+                            }
+                            if(!clickedViewList.contains(arg1)){
+                                clickedViewList.add(arg1);
+                            }
+                            currentContact.setChecked(!(currentContact.getIsChecked()));
 
                             //mContactsAdapter.notifyDataSetChanged();
                             //openConversationForContact(position);
@@ -1285,12 +1554,11 @@ public class StartConversationActivity extends XmppActivity implements OnRosterU
                                 //Clear the search results
                                 filterContacts("");
                             }
-
-                        }
+                    }
                     });
+                    }
 
 
-                }
                 fragments[position] = listFragment;
             }
             return fragments[position];
