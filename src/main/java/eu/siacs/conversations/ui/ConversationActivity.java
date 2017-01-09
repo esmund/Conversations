@@ -527,6 +527,8 @@ public class ConversationActivity extends XmppActivity
 								attachmentChoice);
 					} else {
 						startActivityForResult(intent, attachmentChoice);
+						//TODO add Test commit
+
 					}
 				} else if (fallbackPackageId != null) {
 					startActivity(getInstallApkIntent(fallbackPackageId));
@@ -1412,6 +1414,7 @@ public class ConversationActivity extends XmppActivity
 					selectPresence(c, callback);
 				}
 			} else if (requestCode == ATTACHMENT_CHOICE_TAKE_PHOTO) {
+				//TODO
 				if (mPendingImageUris.size() == 1) {
 					Uri uri = FileBackend.getIndexableTakePhotoUri(mPendingImageUris.get(0));
 					mPendingImageUris.set(0, uri);
