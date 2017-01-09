@@ -811,20 +811,6 @@ public class StartConversationActivity extends XmppActivity implements OnRosterU
         return super.onOptionsItemSelected(item);
     }
 
-//    @Override
-//    public boolean dispatchKeyEvent(KeyEvent event) {
-//        if(event.getKeyCode() == KeyEvent.KEYCODE_DEL && spanArrayList.size() > 0){
-//            if(isHighlighted){
-//                Log.d("debug",spanArrayList.size()+" span array size");
-//                //move cursor
-//                spanArrayList.remove(spanArrayList.size()-1);
-//                isHighlighted = false;
-//                //TODO: does not work
-//                return true;
-//            }
-//        }
-//        return super.dispatchKeyEvent(event);
-//    }
 
     @Override
     public boolean onKeyUp(int keyCode, KeyEvent event) {
@@ -1591,6 +1577,7 @@ public class StartConversationActivity extends XmppActivity implements OnRosterU
             getListView().setFastScrollEnabled(true);
 
         }
+
 
         @Override
         public void onCreateContextMenu(final ContextMenu menu, final View v,
