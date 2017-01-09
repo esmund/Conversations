@@ -899,7 +899,7 @@ public abstract class XmppActivity extends Activity {
 			runOnUiThread(new Runnable() {
 				@Override
 				public void run() {
-					switchToConversation(conversation);
+                    switchToConversation(conversation);
 					hideToast();
 				}
 			});

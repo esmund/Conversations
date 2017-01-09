@@ -51,7 +51,6 @@ import eu.siacs.conversations.Config;
 import eu.siacs.conversations.R;
 import eu.siacs.conversations.crypto.axolotl.AxolotlService;
 import eu.siacs.conversations.crypto.axolotl.FingerprintStatus;
-import eu.siacs.conversations.crypto.axolotl.XmppAxolotlSession;
 import eu.siacs.conversations.entities.Account;
 import eu.siacs.conversations.entities.Blockable;
 import eu.siacs.conversations.entities.Contact;
@@ -221,6 +220,8 @@ public class ConversationActivity extends XmppActivity
 				openConversation();
 			}
 		});
+
+
 
 		listView.setDismissCallback(new EnhancedListView.OnDismissCallback() {
 

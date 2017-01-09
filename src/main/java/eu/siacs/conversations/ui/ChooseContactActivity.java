@@ -5,7 +5,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 import android.support.annotation.StringRes;
-import android.util.Log;
 import android.view.ActionMode;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -132,7 +131,6 @@ public class ChooseContactActivity extends AbstractSearchableListItemActivity {
 				finish();
 			}
 		});
-
 	}
 
 	@Override
