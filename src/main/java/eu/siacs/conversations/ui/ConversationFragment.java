@@ -149,6 +149,7 @@ public class ConversationFragment extends Fragment implements EditMessage.Keyboa
     Camera.PictureCallback rawCallback;
     Camera.ShutterCallback shutterCallback;
     Camera.PictureCallback jpegCallback;
+    AspectFrameLayout layout;
 
     private OnScrollListener mOnScrollListener = new OnScrollListener() {
 
@@ -520,6 +521,8 @@ public class ConversationFragment extends Fragment implements EditMessage.Keyboa
 
         picLayout = (RelativeLayout) view.findViewById(R.id.picLayout);
         capturedImage = (ImageView) view.findViewById(R.id.imageViewCaptured);
+         layout = (AspectFrameLayout) view.findViewById(R.id.continuousCapture_afl);
+
 
 
         messagesView = (ListView) view.findViewById(R.id.messages_view);
@@ -652,6 +655,7 @@ public class ConversationFragment extends Fragment implements EditMessage.Keyboa
                     File f = new File(path);  //
                     Uri imageUri = Uri.fromFile(f);
                     showPicLayout(true, imageUri);
+                    activity.mPendingImageUris.clear();
                     activity.mPendingImageUris.add(imageUri);
                 } catch (FileNotFoundException e) {
                     e.printStackTrace();
@@ -1169,8 +1173,10 @@ public class ConversationFragment extends Fragment implements EditMessage.Keyboa
     public void showCameraLayout(boolean visible) {
         ViewGroup.LayoutParams params = cameraLayout.getLayoutParams();
         if (visible) {
-            params.height = 450;
+            params.height = 500;
             surfaceView.setVisibility(View.VISIBLE);
+
+
         } else {
             params.height = 0;
             surfaceView.setVisibility(View.GONE);
@@ -1183,6 +1189,7 @@ public class ConversationFragment extends Fragment implements EditMessage.Keyboa
         if (visible) {
             picLayout.setVisibility(View.VISIBLE);
             capturedImage.setImageURI(path);
+            capturedImage.setRotation(90);
 
         } else {
             picLayout.setVisibility(View.GONE);
@@ -1740,6 +1747,10 @@ public class ConversationFragment extends Fragment implements EditMessage.Keyboa
         try {
             // open the camera
             camera = Camera.open();
+            camera.setDisplayOrientation(90);
+            Camera.Parameters params= camera.getParameters();
+            surfaceView.getLayoutParams().width=params.getPreviewSize().height;
+            surfaceView.getLayoutParams().height=params.getPreviewSize().width;
         } catch (RuntimeException e) {
             // check for exceptions
             System.err.println(e);
@@ -1747,6 +1758,9 @@ public class ConversationFragment extends Fragment implements EditMessage.Keyboa
         }
         Camera.Parameters param;
         param = camera.getParameters();
+
+        Camera.Size cameraPreviewSize = param.getPreviewSize();
+        layout.setAspectRatio((double) cameraPreviewSize.width / cameraPreviewSize.height);
 
         // modify parameter
         param.setPreviewSize(352, 288);
