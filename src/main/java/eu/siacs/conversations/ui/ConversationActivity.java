@@ -101,7 +101,7 @@ public class ConversationActivity extends XmppActivity
     private String mOpenConversation = null;
     private boolean mPanelOpen = true;
     private Pair<Integer, Integer> mScrollPosition = null;
-    final private List<Uri> mPendingImageUris = new ArrayList<>();
+    final public List<Uri> mPendingImageUris = new ArrayList<>();
     final private List<Uri> mPendingFileUris = new ArrayList<>();
     private Uri mPendingGeoUri = null;
     private boolean forbidProcessingPendings = false;
@@ -528,8 +528,6 @@ public class ConversationActivity extends XmppActivity
                     } else {
 //						startActivityForResult(intent, attachmentChoice);
                         mConversationFragment.showCameraLayout(true);
-                        //TODO add Test commit
-
                     }
                 } else if (fallbackPackageId != null) {
                     startActivity(getInstallApkIntent(fallbackPackageId));
@@ -1415,7 +1413,6 @@ public class ConversationActivity extends XmppActivity
                     selectPresence(c, callback);
                 }
             } else if (requestCode == ATTACHMENT_CHOICE_TAKE_PHOTO) {
-                //TODO
                 if (mPendingImageUris.size() == 1) {
                     Uri uri = FileBackend.getIndexableTakePhotoUri(mPendingImageUris.get(0));
                     mPendingImageUris.set(0, uri);
@@ -1568,7 +1565,7 @@ public class ConversationActivity extends XmppActivity
         });
     }
 
-    private void attachImageToConversation(Conversation conversation, Uri uri) {
+    public void attachImageToConversation(Conversation conversation, Uri uri) {
         if (conversation == null) {
             return;
         }

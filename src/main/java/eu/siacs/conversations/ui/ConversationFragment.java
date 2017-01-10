@@ -9,6 +9,11 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentSender.SendIntentException;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.hardware.Camera;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.text.Editable;
@@ -17,13 +22,18 @@ import android.util.Log;
 import android.util.Pair;
 import android.view.ContextMenu;
 import android.view.ContextMenu.ContextMenuInfo;
+import android.view.Display;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.MenuItem;
+import android.view.Surface;
+import android.view.SurfaceHolder;
+import android.view.SurfaceView;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.ViewGroup;
+import android.view.WindowManager;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.AbsListView;
@@ -40,6 +50,10 @@ import android.widget.Toast;
 
 import net.java.otr4j.session.SessionStatus;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -57,6 +71,7 @@ import eu.siacs.conversations.entities.Presence;
 import eu.siacs.conversations.entities.Transferable;
 import eu.siacs.conversations.entities.TransferablePlaceholder;
 import eu.siacs.conversations.http.HttpDownloadConnection;
+import eu.siacs.conversations.persistance.FileBackend;
 import eu.siacs.conversations.services.MessageArchiveService;
 import eu.siacs.conversations.services.XmppConnectionService;
 import eu.siacs.conversations.ui.XmppActivity.OnPresenceSelected;
@@ -71,7 +86,9 @@ import eu.siacs.conversations.xmpp.XmppConnection;
 import eu.siacs.conversations.xmpp.chatstate.ChatState;
 import eu.siacs.conversations.xmpp.jid.Jid;
 
-public class ConversationFragment extends Fragment implements EditMessage.KeyboardListener {
+import static android.content.Context.WINDOW_SERVICE;
+
+public class ConversationFragment extends Fragment implements EditMessage.KeyboardListener, SurfaceHolder.Callback {
 
     protected Conversation conversation;
     private OnClickListener leaveMuc = new OnClickListener() {
@@ -119,6 +136,19 @@ public class ConversationFragment extends Fragment implements EditMessage.Keyboa
     private Toast messageLoaderToast;
     private RelativeLayout cameraLayout;
     private ImageView closeCamera;
+    private ImageView cameraClick;
+    private ImageView picCancel;
+    private ImageView picSend;
+    private ImageView capturedImage;
+    private RelativeLayout picLayout;
+
+    Camera camera;
+    SurfaceView surfaceView;
+    SurfaceHolder surfaceHolder;
+
+    Camera.PictureCallback rawCallback;
+    Camera.ShutterCallback shutterCallback;
+    Camera.PictureCallback jpegCallback;
 
     private OnScrollListener mOnScrollListener = new OnScrollListener() {
 
@@ -444,6 +474,54 @@ public class ConversationFragment extends Fragment implements EditMessage.Keyboa
                 showCameraLayout(false);
             }
         });
+        cameraClick = (ImageView) view.findViewById(R.id.imageViewCameraClick);
+        cameraClick.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                try {
+                    captureImage(view);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+        picCancel = (ImageView) view.findViewById(R.id.imageViewCancel);
+        picCancel.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                showPicLayout(false, null);
+            }
+        });
+        picSend = (ImageView) view.findViewById(R.id.imageViewSend);
+        picSend.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if (activity.mPendingImageUris.size() == 1) {
+                    Uri uri = FileBackend.getIndexableTakePhotoUri(activity.mPendingImageUris.get(0));
+                    activity.mPendingImageUris.set(0, uri);
+                    if (activity.xmppConnectionServiceBound) {
+                        Log.d(Config.LOGTAG, "ConversationsActivity.onActivityResult() - attaching image to conversations. TAKE_PHOTO");
+                        activity.attachImageToConversation(activity.getSelectedConversation(), uri);
+                        activity.mPendingImageUris.clear();
+                    }
+                    if (!Config.ONLY_INTERNAL_STORAGE) {
+                        Intent intent = new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE);
+                        intent.setData(uri);
+                        activity.sendBroadcast(intent);
+                    }
+
+                } else {
+                    activity.mPendingImageUris.clear();
+                }
+                showPicLayout(false, null);
+                showCameraLayout(false);
+            }
+        });
+
+        picLayout = (RelativeLayout) view.findViewById(R.id.picLayout);
+        capturedImage = (ImageView) view.findViewById(R.id.imageViewCaptured);
+
+
         messagesView = (ListView) view.findViewById(R.id.messages_view);
         messagesView.setOnScrollListener(mOnScrollListener);
         messagesView.setTranscriptMode(ListView.TRANSCRIPT_MODE_NORMAL);
@@ -547,6 +625,45 @@ public class ConversationFragment extends Fragment implements EditMessage.Keyboa
         messagesView.setAdapter(messageListAdapter);
 
         registerForContextMenu(messagesView);
+
+        //CAMERA FEATURE
+        surfaceView = (SurfaceView) view.findViewById(R.id.surfaceViewCamera);
+        surfaceHolder = surfaceView.getHolder();
+
+        // Install a SurfaceHolder.Callback so we get notified when the
+        // underlying surface is created and destroyed.
+        surfaceHolder.addCallback(this);
+
+        // deprecated setting, but required on Android versions prior to 3.0
+        surfaceHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
+
+        jpegCallback = new Camera.PictureCallback() {
+            public void onPictureTaken(byte[] data, Camera camera) {
+                FileOutputStream outStream = null;
+                try {
+                    String fileName = String.format("/sdcard/%d.jpg", System.currentTimeMillis());
+                    outStream = new FileOutputStream(fileName);
+                    outStream.write(data);
+                    outStream.close();
+                    Log.d("Log", "onPictureTaken - wrote bytes: " + data.length);
+                    String filename = "image.png";
+                    String path = "/mnt/sdcard/" + filename;
+                    path = fileName;
+                    File f = new File(path);  //
+                    Uri imageUri = Uri.fromFile(f);
+                    showPicLayout(true, imageUri);
+                    activity.mPendingImageUris.add(imageUri);
+                } catch (FileNotFoundException e) {
+                    e.printStackTrace();
+                    showPicLayout(false, null);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                    showPicLayout(false, null);
+                } finally {
+                }
+                refreshCamera();
+            }
+        };
 
         return view;
     }
@@ -1053,10 +1170,24 @@ public class ConversationFragment extends Fragment implements EditMessage.Keyboa
         ViewGroup.LayoutParams params = cameraLayout.getLayoutParams();
         if (visible) {
             params.height = 450;
+            surfaceView.setVisibility(View.VISIBLE);
         } else {
             params.height = 0;
+            surfaceView.setVisibility(View.GONE);
         }
         cameraLayout.setLayoutParams(params);
+    }
+
+    public void showPicLayout(boolean visible, Uri path) {
+//        ViewGroup.LayoutParams params = cameraLayout.getLayoutParams();
+        if (visible) {
+            picLayout.setVisibility(View.VISIBLE);
+            capturedImage.setImageURI(path);
+
+        } else {
+            picLayout.setVisibility(View.GONE);
+        }
+
     }
 
 
@@ -1517,5 +1648,128 @@ public class ConversationFragment extends Fragment implements EditMessage.Keyboa
         }
     }
 
+    public void captureImage(View v) throws IOException {
+        //take the picture
+        camera.takePicture(null, null, jpegCallback);
+    }
+
+    public void refreshCamera() {
+        if (surfaceHolder.getSurface() == null) {
+            // preview surface does not exist
+            return;
+        }
+
+        // stop preview before making changes
+        try {
+            camera.stopPreview();
+            isPreviewRunning = false;
+        } catch (Exception e) {
+            // ignore: tried to stop a non-existent preview
+        }
+
+        // set preview size and make any resize, rotate or
+        // reformatting changes here
+        // start preview with new settings
+        try {
+            camera.setPreviewDisplay(surfaceHolder);
+            camera.startPreview();
+            isPreviewRunning = true;
+        } catch (Exception e) {
+
+        }
+    }
+
+    public void surfaceChanged(SurfaceHolder holder, int format, int w, int h) {
+        // Now that the size is known, set up the camera parameters and begin
+        // the preview.
+        refreshCamera();
+//        if (isPreviewRunning) {
+//            camera.stopPreview();
+//        }
+//
+//        Camera.Parameters parameters = camera.getParameters();
+//
+//        List<Camera.Size> allSizes = parameters.getSupportedPictureSizes();
+//        Camera.Size size = allSizes.get(0); // get top size
+//        for (int i = 0; i < allSizes.size(); i++) {
+//            if (allSizes.get(i).width > size.width)
+//                size = allSizes.get(i);
+//        }
+//
+//        Display display = ((WindowManager) getActivity().getSystemService(WINDOW_SERVICE)).getDefaultDisplay();
+//
+//        if (display.getRotation() == Surface.ROTATION_0) {
+//            parameters.setPreviewSize(size.height,size.width);
+//            camera.setDisplayOrientation(90);
+//        }
+//
+//        if (display.getRotation() == Surface.ROTATION_90) {
+//            parameters.setPreviewSize(size.width,size.height);
+//        }
+//
+//        if (display.getRotation() == Surface.ROTATION_180) {
+//            parameters.setPreviewSize(size.height, size.width);
+//        }
+//
+//        if (display.getRotation() == Surface.ROTATION_270) {
+//            parameters.setPreviewSize(size.width, size.height);
+//            camera.setDisplayOrientation(180);
+//        }
+//
+//
+//
+//        camera.setParameters(parameters);
+//        previewCamera();
+    }
+
+    boolean isPreviewRunning;
+
+    public void previewCamera() {
+        try {
+            camera.setPreviewDisplay(surfaceHolder);
+            camera.startPreview();
+            isPreviewRunning = true;
+        } catch (Exception e) {
+            Log.d(ConversationFragment.class.getSimpleName(), "Cannot start preview", e);
+        }
+    }
+
+    Bitmap scaled;
+
+    public void surfaceCreated(SurfaceHolder holder) {
+        try {
+            // open the camera
+            camera = Camera.open();
+        } catch (RuntimeException e) {
+            // check for exceptions
+            System.err.println(e);
+            return;
+        }
+        Camera.Parameters param;
+        param = camera.getParameters();
+
+        // modify parameter
+        param.setPreviewSize(352, 288);
+        camera.setParameters(param);
+        try {
+            // The Surface has been created, now tell the camera where to draw
+            // the preview.
+            camera.setPreviewDisplay(surfaceHolder);
+            camera.startPreview();
+        } catch (Exception e) {
+            // check for exceptions
+            System.err.println(e);
+            return;
+        }
+
+
+    }
+
+    public void surfaceDestroyed(SurfaceHolder holder) {
+        // stop preview and release camera
+        camera.stopPreview();
+        camera.release();
+        camera = null;
+    }
 
 }
