@@ -58,6 +58,7 @@
             android:textColor="@color/white"
             android:textSize="?attr/TextSizeBody"
             android:textStyle="bold" />
+
     </RelativeLayout>
 
     <RelativeLayout
@@ -66,18 +67,12 @@
         android:layout_height="0dp"
         android:layout_alignParentBottom="true">
 
-        <eu.siacs.conversations.ui.AspectFrameLayout
-            android:id="@+id/continuousCapture_afl"
+        <FrameLayout
+            android:id="@+id/camera_preview"
+            android:layout_centerInParent="true"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:layout_centerInParent="true">
-
-            <SurfaceView
-                android:id="@+id/surfaceViewCamera"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:layout_gravity="center" />
-        </eu.siacs.conversations.ui.AspectFrameLayout>
+            />
 
 
         <ImageView
@@ -105,14 +100,18 @@
         <RelativeLayout
             android:id="@+id/picLayout"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:visibility="gone">
+            android:layout_height="0dp"
+            android:visibility="gone"
+            android:layout_alignParentLeft="true"
+            android:layout_alignParentStart="true">
 
             <ImageView
                 android:id="@+id/imageViewCaptured"
-                android:layout_width="match_parent"
+                android:layout_width="fill_parent"
                 android:layout_height="match_parent"
-                android:scaleType="center"
+                android:scaleType="fitStart"
+                android:adjustViewBounds="true"
+                android:visibility="gone"
                 android:src="@color/background_floating_material_light" />
 
             <ImageView

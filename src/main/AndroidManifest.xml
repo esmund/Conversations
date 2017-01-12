@@ -43,6 +43,7 @@
             android:launchMode="singleTask"
             android:minWidth="300dp"
             android:minHeight="300dp"
+            android:screenOrientation="portrait"
             android:windowSoftInputMode="stateHidden">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
