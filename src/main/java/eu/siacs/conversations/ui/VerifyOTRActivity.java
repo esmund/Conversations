@@ -13,9 +13,6 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.google.zxing.integration.android.IntentIntegrator;
-import com.google.zxing.integration.android.IntentResult;
-
 import net.java.otr4j.OtrException;
 import net.java.otr4j.session.Session;
 
@@ -209,7 +206,7 @@ public class VerifyOTRActivity extends XmppActivity implements XmppConnectionSer
 			}
 			this.mode = intent.getIntExtra("mode", MODE_MANUAL_VERIFICATION);
 			if (this.mode == MODE_SCAN_FINGERPRINT) {
-				new IntentIntegrator(this).initiateScan();
+				//new IntentIntegrator(this).initiateScan();
 				return false;
 			}
 			return true;
@@ -220,21 +217,21 @@ public class VerifyOTRActivity extends XmppActivity implements XmppConnectionSer
 
 	@Override
 	public void onActivityResult(int requestCode, int resultCode, Intent intent) {
-		if ((requestCode & 0xFFFF) == IntentIntegrator.REQUEST_CODE) {
-			IntentResult scanResult = IntentIntegrator.parseActivityResult(requestCode, resultCode, intent);
-			if (scanResult != null && scanResult.getFormatName() != null) {
-				String data = scanResult.getContents();
-				XmppUri uri = new XmppUri(data);
-				if (xmppConnectionServiceBound) {
-					verifyWithUri(uri);
-					finish();
-				} else {
-					this.mPendingUri = uri;
-				}
-			} else {
-				finish();
-			}
-		}
+//		if ((requestCode & 0xFFFF) == IntentIntegrator.REQUEST_CODE) {
+//			IntentResult scanResult = IntentIntegrator.parseActivityResult(requestCode, resultCode, intent);
+//			if (scanResult != null && scanResult.getFormatName() != null) {
+//				String data = scanResult.getContents();
+//				XmppUri uri = new XmppUri(data);
+//				if (xmppConnectionServiceBound) {
+//					verifyWithUri(uri);
+//					finish();
+//				} else {
+//					this.mPendingUri = uri;
+//				}
+//			} else {
+//				finish();
+//			}
+//		}
 		super.onActivityResult(requestCode, requestCode, intent);
 	}
 

@@ -297,7 +297,7 @@ public abstract class XmppActivity extends Activity {
 		builder.create().show();
 	}
 
-	abstract void onBackendConnected();
+    abstract void onBackendConnected();
 
 	protected void registerListeners() {
 		if (this instanceof XmppConnectionService.OnConversationUpdate) {
@@ -1001,7 +1001,7 @@ public abstract class XmppActivity extends Activity {
 
 	protected void shareUri() {
 		String uri = getShareableUri();
-		if (uri == null || uri.isEmpty()) {
+        if (uri == null || uri.isEmpty()) {
 			return;
 		}
 		Intent shareIntent = new Intent();

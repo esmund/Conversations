@@ -5,13 +5,9 @@ import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
 import android.app.ActionBar;
 import android.app.ActionBar.Tab;
-import android.app.ActionBar.TabListener;
 import android.app.AlertDialog;
 import android.app.Dialog;
 import android.app.Fragment;
-import android.app.FragmentManager;
-import android.app.FragmentTransaction;
-import android.app.ListFragment;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -26,7 +22,6 @@ import android.nfc.NfcAdapter;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Parcelable;
-import android.support.v4.view.PagerAdapter;
 import android.support.v4.view.ViewPager;
 import android.text.Editable;
 import android.text.Spannable;
@@ -41,16 +36,11 @@ import android.text.style.StyleSpan;
 import android.text.style.TypefaceSpan;
 import android.util.Log;
 import android.util.Pair;
-import android.view.ContextMenu;
-import android.view.ContextMenu.ContextMenuInfo;
 import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
-import android.view.ViewGroup;
-import android.view.inputmethod.InputMethodManager;
 import android.widget.AdapterView;
-import android.widget.AdapterView.AdapterContextMenuInfo;
 import android.widget.AdapterView.OnItemClickListener;
 import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
@@ -62,9 +52,6 @@ import android.widget.ListView;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
-
-import com.google.zxing.integration.android.IntentIntegrator;
-import com.google.zxing.integration.android.IntentResult;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -89,10 +76,10 @@ import eu.siacs.conversations.ui.adapter.KnownHostsAdapter;
 import eu.siacs.conversations.ui.adapter.ListItemAdapter;
 import eu.siacs.conversations.utils.XmppUri;
 import eu.siacs.conversations.xmpp.OnUpdateBlocklist;
-import eu.siacs.conversations.xmpp.XmppConnection;
 import eu.siacs.conversations.xmpp.jid.InvalidJidException;
 import eu.siacs.conversations.xmpp.jid.Jid;
 
+import static eu.siacs.conversations.R.id.account;
 import static eu.siacs.conversations.R.string.delete;
 
 public class StartConversationActivity extends XmppActivity implements OnRosterUpdate, OnUpdateBlocklist {
@@ -103,7 +90,7 @@ public class StartConversationActivity extends XmppActivity implements OnRosterU
     private Tab mContactsTab;
     private Tab mConferencesTab;
     private ViewPager mViewPager;
-    private ListPagerAdapter mListPagerAdapter;
+    //private ListPagerAdapter mListPagerAdapter;
     private List<ListItem> contacts = new ArrayList<>();
     private ArrayAdapter<ListItem> mContactsAdapter;
     private List<ListItem> conferences = new ArrayList<>();
@@ -115,10 +102,12 @@ public class StartConversationActivity extends XmppActivity implements OnRosterU
     private EditText mSearchEditText;
     private EditText msgField;
     private ToContactEditText toContactEditText;
+    private ListView contactListView;
     private AtomicBoolean mRequestedContactsPermission = new AtomicBoolean(false);
     private Button doneBtn;
     private final int REQUEST_SYNC_CONTACTS = 0x3b28cf;
     private final int REQUEST_CREATE_CONFERENCE = 0x3b39da;
+    private final int REQUEST_CREATE_CONTACT = 2359;
     private Dialog mCurrentDialog = null;
     private boolean textIsUserInput = true;
     private StringBuilder currentSearchString = new StringBuilder();
@@ -126,72 +115,70 @@ public class StartConversationActivity extends XmppActivity implements OnRosterU
     private ArrayList<Contact> clickedContactsList = new ArrayList();
     private ArrayList<View> clickedViewList = new ArrayList<>();
     private ArrayList<ContactSpan> contactSpanArrayList = new ArrayList<>();
+    private Fragment convoFrag;
     private char lastDelChar;
     private int indexOfSelectedSpan = -1;
-    //final ArrayList<String> selectedContacts = new ArrayList<>();
-    private final int INDEX_OF_LIST_CONTACT = 1;
-    private final int INDEX_OF_SPAN = 2;
 
     private boolean isHighlighted = false;
     private boolean delimiterDeleted = false;
 
 
-    private MenuItem.OnActionExpandListener mOnActionExpandListener = new MenuItem.OnActionExpandListener() {
-
-        @Override
-        public boolean onMenuItemActionExpand(MenuItem item) {
-            mSearchEditText.post(new Runnable() {
-
-                @Override
-                public void run() {
-                    mSearchEditText.requestFocus();
-                    InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-                    imm.showSoftInput(mSearchEditText,
-                            InputMethodManager.SHOW_IMPLICIT);
-                }
-            });
-
-            return true;
-        }
-
-        @Override
-        public boolean onMenuItemActionCollapse(MenuItem item) {
-            hideKeyboard();
-            mSearchEditText.setText("");
-            filter(null);
-            return true;
-        }
-
-    };
+//    private MenuItem.OnActionExpandListener mOnActionExpandListener = new MenuItem.OnActionExpandListener() {
+//
+//        @Override
+//        public boolean onMenuItemActionExpand(MenuItem item) {
+//            mSearchEditText.post(new Runnable() {
+//
+//                @Override
+//                public void run() {
+//                    mSearchEditText.requestFocus();
+//                    InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+//                    imm.showSoftInput(mSearchEditText,
+//                            InputMethodManager.SHOW_IMPLICIT);
+//                }
+//            });
+//
+//            return true;
+//        }
+//
+//        @Override
+//        public boolean onMenuItemActionCollapse(MenuItem item) {
+//            hideKeyboard();
+//            mSearchEditText.setText("");
+//            filter(null);
+//            return true;
+//        }
+//
+//    };
 
     private boolean mHideOfflineContacts = false;
-    private TabListener mTabListener = new TabListener() {
-
-        @Override
-        public void onTabUnselected(Tab tab, FragmentTransaction ft) {
-            return;
-        }
-
-        @Override
-        public void onTabSelected(Tab tab, FragmentTransaction ft) {
-            mViewPager.setCurrentItem(tab.getPosition());
-            onTabChanged();
-        }
-
-        @Override
-        public void onTabReselected(Tab tab, FragmentTransaction ft) {
-            return;
-        }
-    };
-    private ViewPager.SimpleOnPageChangeListener mOnPageChangeListener = new ViewPager.SimpleOnPageChangeListener() {
-        @Override
-        public void onPageSelected(int position) {
-            if (getActionBar() != null) {
-                getActionBar().setSelectedNavigationItem(position);
-            }
-            onTabChanged();
-        }
-    };
+//    private TabListener mTabListener = new TabListener() {
+//
+//        @Override
+//        public void onTabUnselected(Tab tab, FragmentTransaction ft) {
+//            return;
+//        }
+//
+//        @Override
+//        public void onTabSelected(Tab tab, FragmentTransaction ft) {
+//            mViewPager.setCurrentItem(tab.getPosition());
+//            onTabChanged();
+//        }
+//
+//        @Override
+//        public void onTabReselected(Tab tab, FragmentTransaction ft) {
+//            return;
+//        }
+//    };
+//    private ViewPager.SimpleOnPageChangeListener mOnPageChangeListener = new ViewPager.SimpleOnPageChangeListener() {
+//        @Override
+//        public void onPageSelected(int position) {
+//            if (getActionBar() != null) {
+//                getActionBar().setSelectedNavigationItem(position);
+//            }
+//            onTabChanged();
+//        }
+//    };
 
     private TextWatcher mSearchTextWatcher = new TextWatcher() {
 
@@ -202,7 +189,7 @@ public class StartConversationActivity extends XmppActivity implements OnRosterU
                 //Do not search when textview is changed programmatically
                 filter(currentSearchString.toString());
                 //Log.d("debug","filter contact for "+currentSearchString.toString());
-                Log.d("debug","filter = ");
+                Log.d("debug","filter = "+currentSearchString.toString());
             }
             else {
                 textIsUserInput = true;
@@ -221,59 +208,61 @@ public class StartConversationActivity extends XmppActivity implements OnRosterU
         @Override
         public void onTextChanged(CharSequence s, int start, int before, int count) {
 
-            if (textIsUserInput && s.toString().length() != 0) {
-                //add the new chars into currentSearchString
-                currentSearchString.append(s.subSequence(start, start + count).toString());
-                if (before > 0) {
+            if (textIsUserInput ) {
+                if(s.toString().length() != 0) {
+                    //add the new chars into currentSearchString
+                    currentSearchString.append(s.subSequence(start, start + count).toString());
+                    if (before > 0) {
 
-                    if(lastDelChar == delimiter.charAt(0)) {
+                        if (lastDelChar == delimiter.charAt(0)) {
 //                        Spannable spanText = toContactEditText.getText();
 //                        String toCheck = spanText.subSequence(spanText.getSpanStart(this), spanText.getSpanEnd(this)).toString();
 //                        indexOfSelectedSpan=selectedContacts.indexOf((toCheck));
-                        //get the previous position
-                        indexOfSelectedSpan = spanArrayList.size()-1;
-                        spanArrayList.get(indexOfSelectedSpan).paintText();
-                        delimiterDeleted = true;
+                            //get the previous position
+                            indexOfSelectedSpan = spanArrayList.size() - 1;
+                            spanArrayList.get(indexOfSelectedSpan).paintText();
+                            delimiterDeleted = true;
+                        } else {
+                            delimiterDeleted = false;
+                        }
                     }
-                    else {
-                        delimiterDeleted = false;
-                    }
+                }
 
 
                     if (currentSearchString.length() - before > 0) {
-                        textIsUserInput = false;
+                        //textIsUserInput = false;
                         //delete last backspaced char from currentSearchString
                         currentSearchString.delete(currentSearchString.length() - before, currentSearchString.length());
                     } else {
                         //clear currentSearchString if it's empty
-                        currentSearchString.replace(0, currentSearchString.length(), "");
+                        currentSearchString.delete(0, currentSearchString.length());
+                        //currentSearchString.replace(0, currentSearchString.length(), "");
                     }
                 }
             }
-        }
     };
-
-    private TextView.OnEditorActionListener mSearchDone = new TextView.OnEditorActionListener() {
-        @Override
-        public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
-            int pos = getActionBar().getSelectedNavigationIndex();
-            if (pos == 0) {
-                if (contacts.size() == 1) {
-                    openConversationForContact((Contact) contacts.get(0));
-                    return true;
-                }
-            } else {
-                if (conferences.size() == 1) {
-                    openConversationsForBookmark((Bookmark) conferences.get(0));
-                    return true;
-                }
-            }
-            hideKeyboard();
-            mListPagerAdapter.requestFocus(pos);
-            return true;
-        }
-    };
-    private MenuItem mMenuSearchView;
+//
+//    private TextView.OnEditorActionListener mSearchDone = new TextView.OnEditorActionListener() {
+//        @Override
+//        public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
+//            int pos = getActionBar().getSelectedNavigationIndex();
+//            if (pos == 0) {
+//                if (contacts.size() == 1) {
+//                    openConversationForContact((Contact) contacts.get(0));
+//                    return true;
+//                }
+//            } else {
+//                if (conferences.size() == 1) {
+//                    openConversationsForBookmark((Bookmark) conferences.get(0));
+//                    return true;
+//                }
+//            }
+//            hideKeyboard();
+//            //mListPagerAdapter.requestFocus(pos);
+//            return true;
+//        }
+//    };
+//    private MenuItem mMenuSearchView;
 
 
     private View.OnClickListener onDoneClick = new View.OnClickListener() {
@@ -304,18 +293,18 @@ public class StartConversationActivity extends XmppActivity implements OnRosterU
             }
         }};
 
-    ListItemAdapter.OnTagClickedListener mOnTagClickedListener = new ListItemAdapter.OnTagClickedListener() {
-        @Override
-        public void onTagClicked(String tag) {
-            Log.d("debug","onTagClicked");
-            if (mMenuSearchView != null) {
-                mMenuSearchView.expandActionView();
-                mSearchEditText.setText("");
-                mSearchEditText.append(tag);
-                filter(tag);
-            }
-        }
-    };
+//    ListItemAdapter.OnTagClickedListener mOnTagClickedListener = new ListItemAdapter.OnTagClickedListener() {
+//        @Override
+//        public void onTagClicked(String tag) {
+//            Log.d("debug","onTagClicked");
+//            if (mMenuSearchView != null) {
+//                mMenuSearchView.expandActionView();
+//                mSearchEditText.setText("");
+//                mSearchEditText.append(tag);
+//                filter(tag);
+//            }
+//        }
+//    };
     private String mInitialJid;
     private Pair<Integer, Intent> mPostponedActivityResult;
     private UiCallback<Conversation> mAdhocConferenceCallback = new UiCallback<Conversation>() {
@@ -388,19 +377,145 @@ public class StartConversationActivity extends XmppActivity implements OnRosterU
 //
         msgField = (EditText)findViewById(R.id.et_msg_field);
         toContactEditText= (ToContactEditText)findViewById(R.id.to_contact_field);
-        mViewPager = (ViewPager) findViewById(R.id.start_conversation_view_pager);
+
+        //mViewPager = (ViewPager) findViewById(R.id.start_conversation_view_pager);
+
         doneBtn = (Button) findViewById(R.id.button_done);
 
         //mViewPager.setOnPageChangeListener(mOnPageChangeListener);
-        mListPagerAdapter = new ListPagerAdapter(getFragmentManager());
-        mViewPager.setAdapter(mListPagerAdapter);
+        //mListPagerAdapter = new ListPagerAdapter(getFragmentManager());
+        //mViewPager.setAdapter(mListPagerAdapter);
 
         //mConferenceAdapter = new ListItemAdapter(this, conferences);
         mContactsAdapter = new ListItemAdapter(this, contacts);
 
-        ((ListItemAdapter) mContactsAdapter).setOnTagClickedListener(this.mOnTagClickedListener);
+        //((ListItemAdapter) mContactsAdapter).setOnTagClickedListener(this.mOnTagClickedListener);
         this.mHideOfflineContacts = getPreferences().getBoolean("hide_offline", false);
         doneBtn.setOnClickListener(onDoneClick);
+
+        contactListView = (ListView) findViewById(R.id.start_conversation_list_view);
+
+        contactListView.setAdapter(mContactsAdapter);
+        //contactListView.setContextMenu(R.menu.contact_context);
+        contactListView.setOnItemClickListener(new OnItemClickListener() {
+
+            @Override
+            //@TargetApi(Build.VERSION_CODES.LOLLIPOP)
+            public void onItemClick(AdapterView<?> arg0, View arg1,
+                                    int position, long arg3) {
+
+                StringBuilder currentText = new StringBuilder(toContactEditText.getText().toString());
+                Spannable spannableText = toContactEditText.getText();
+                SpannableStringBuilder spanStringBuilder = new SpannableStringBuilder();
+                CheckBox selectorChkbox = (CheckBox)(arg1.findViewById(R.id.selected_checkbox));
+                //workaround for making view clickable
+                selectorChkbox.setFocusable(false);
+                RoundedBackgroundSpan bgSpan = new RoundedBackgroundSpan(StartConversationActivity.this);
+                Contact currentContact = (Contact) arg0.getAdapter().getItem(position);
+                int indexOfCheckedListItem = clickedViewList.indexOf(arg1);
+                boolean hasTypedChars = true;
+
+                if(selectorChkbox.isChecked()){
+                    if(isHighlighted) {
+                        if(indexOfSelectedSpan == indexOfCheckedListItem) {
+                            deleteSpan(indexOfSelectedSpan);
+                            contactSpanArrayList.remove(indexOfSelectedSpan);
+                            indexOfSelectedSpan = -1;
+                        }
+                        else {
+                            deleteSpan(indexOfCheckedListItem,1);
+                            contactSpanArrayList.get(indexOfCheckedListItem).setCheckbox(true);
+                            contactSpanArrayList.remove(indexOfCheckedListItem);
+
+                            if(indexOfSelectedSpan > indexOfCheckedListItem){
+                                indexOfSelectedSpan --;
+                            }
+                            isHighlighted = true;
+
+                        }
+                    }else {
+                        ((TextView) arg1.findViewById(R.id.contact_display_name)).setTextColor(getPrimaryTextColor());
+                        ((TextView) arg1.findViewById(R.id.contact_jid)).setTextColor(getPrimaryTextColor());
+
+                        //get the string to remove from edittext view
+                        Jid jidToRemove = ((ListItem) arg0.getAdapter().getItem(position)).getJid();
+                        textIsUserInput = false;
+                        int indexToRemove = checkIndexFromJid(jidToRemove);
+                        deleteSpan(indexToRemove,1);
+                        contactSpanArrayList.remove(indexToRemove);
+                        indexOfSelectedSpan = -1;
+                        toContactEditText.setSelection(toContactEditText.length());
+                    }
+
+                }
+                else {
+
+                    if(isHighlighted){
+                        deleteSpan(indexOfSelectedSpan);
+                        contactSpanArrayList.get(indexOfSelectedSpan).setCheckbox();
+                        contactSpanArrayList.remove(indexOfSelectedSpan);
+                        indexOfSelectedSpan = -1;
+                    }
+
+                    contactSpanArrayList.add(new ContactSpan(currentContact,arg1,getPrimaryTextColor()));
+
+                    if (currentSearchString.length() > 0) {
+                        String temp;
+                        //Get only the current typed string
+                        String newText = currentText.substring(0, currentText.length() - currentSearchString.length());
+                        temp = newText;
+                        //remove the typed string from edit field
+                        toContactEditText.setText(newText);
+                        temp = temp + ((ListItem) arg0.getAdapter().getItem(position)).getJid();
+
+                        spanStringBuilder.append(temp);
+                        textIsUserInput = false;
+                        spanStringBuilder.append(delimiter);
+                        populateEdittext(spanStringBuilder.toString());
+                        hasTypedChars = true;
+
+
+                    } else {
+
+                        spanStringBuilder.append(((ListItem) arg0.getAdapter().getItem(position)).getDisplayName() + "");
+                        populateEdittext(toContactEditText.getText()+spanStringBuilder.toString());
+                    }
+
+
+
+                    //selectedContacts.add(((ListItem) arg0.getAdapter().getItem(position)).getJid().toString());
+
+
+                    //clear current search string
+                    currentSearchString.replace(0, currentSearchString.length(), "");
+                    spanStringBuilder.replace(0, spanStringBuilder.length(), "");
+                    //set cursor to the end of edit text
+                    toContactEditText.setSelection(toContactEditText.length());
+
+                    ((TextView) arg1.findViewById(R.id.contact_display_name)).setTextColor(0xFF3366BB);
+                    ((TextView) arg1.findViewById(R.id.contact_jid)).setTextColor(0xFF3366BB);
+                    hideKeyboard();
+                }
+                selectorChkbox.setChecked(!selectorChkbox.isChecked());
+
+                if(!clickedContactsList.contains(currentContact)) {
+                    clickedContactsList.add(currentContact);
+                }
+                if(!clickedViewList.contains(arg1)){
+                    clickedViewList.add(arg1);
+                }
+                currentContact.setChecked(!(currentContact.getIsChecked()));
+
+                //mContactsAdapter.notifyDataSetChanged();
+                //openConversationForContact(position);
+
+                if(hasTypedChars){
+                    hasTypedChars = false;
+                    //Clear the search results
+                    filterContacts("");
+                }
+            }
+        });
 
 
     }
@@ -595,7 +710,7 @@ public class StartConversationActivity extends XmppActivity implements OnRosterU
         final AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle(R.string.join_conference);
         final View dialogView = getLayoutInflater().inflate(R.layout.join_conference_dialog, null);
-        final Spinner spinner = (Spinner) dialogView.findViewById(R.id.account);
+        final Spinner spinner = (Spinner) dialogView.findViewById(account);
         final AutoCompleteTextView jid = (AutoCompleteTextView) dialogView.findViewById(R.id.jid);
         final TextView jabberIdDesc = (TextView) dialogView.findViewById(R.id.jabber_id);
         jabberIdDesc.setText(R.string.conference_address);
@@ -675,8 +790,8 @@ public class StartConversationActivity extends XmppActivity implements OnRosterU
         final AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle(R.string.create_conference);
         final View dialogView = getLayoutInflater().inflate(R.layout.create_conference_dialog, null);
-        final Spinner spinner = (Spinner) dialogView.findViewById(R.id.account);
-        final EditText subject = (EditText) dialogView.findViewById(R.id.subject);
+        final Spinner spinner = (Spinner) dialogView.findViewById(account);
+        //final EditText subject = (EditText) dialogView.findViewById(subject);
         populateAccountSpinner(this, mActivatedAccounts, spinner);
         builder.setView(dialogView);
         builder.setPositiveButton(R.string.choose_participants, new OnClickListener() {
@@ -692,7 +807,7 @@ public class StartConversationActivity extends XmppActivity implements OnRosterU
                 Intent intent = new Intent(getApplicationContext(), ChooseContactActivity.class);
                 intent.putExtra("multiple", true);
                 intent.putExtra("show_enter_jid", true);
-                intent.putExtra("subject", subject.getText().toString());
+                //intent.putExtra("subject", subject.getText().toString());
                 intent.putExtra(EXTRA_ACCOUNT, account.getJid().toBareJid().toString());
                 intent.putExtra(ChooseContactActivity.EXTRA_TITLE_RES_ID, R.string.choose_participants);
                 startActivityForResult(intent, REQUEST_CREATE_CONFERENCE);
@@ -747,7 +862,7 @@ public class StartConversationActivity extends XmppActivity implements OnRosterU
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.start_conversation, menu);
         MenuItem menuCreateContact = menu.findItem(R.id.action_create_contact);
-        MenuItem menuCreateConference = menu.findItem(R.id.action_conference);
+        //MenuItem menuCreateConference = menu.findItem(R.id.action_conference);
         MenuItem menuHideOffline = menu.findItem(R.id.action_hide_offline);
         menuHideOffline.setChecked(this.mHideOfflineContacts);
 
@@ -769,16 +884,16 @@ public class StartConversationActivity extends XmppActivity implements OnRosterU
 //                return false;
 //            }
 //        });
+        menuCreateContact.setVisible(true);
+       // menuCreateContact.setVisible(false);
 
-
-
-        if (getActionBar().getSelectedNavigationIndex() == 0) {
-            menuCreateConference.setVisible(false);
-        } else {
-            menuCreateContact.setVisible(false);
-        }
+//        if (getActionBar().getSelectedNavigationIndex() == 0) {
+//            menuCreateConference.setVisible(false);
+//        } else {
+//            menuCreateContact.setVisible(false);
+//        }
         if (mInitialJid != null) {
-            mMenuSearchView.expandActionView();
+            //mMenuSearchView.expandActionView();
             mSearchEditText.append(mInitialJid);
             filter(mInitialJid);
         }
@@ -789,16 +904,21 @@ public class StartConversationActivity extends XmppActivity implements OnRosterU
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
             case R.id.action_create_contact:
-                showCreateContactDialog(null, null);
+                Intent intent = new Intent(getApplicationContext(), CreateContactActivity.class);
+                intent.putExtra("uri", xmppConnectionService.getAccounts().get(0).getShareableUri());
+                intent.putExtra("displayName", xmppConnectionService.getAccounts().get(0).getDisplayName());
+                intent.putExtra("jid", xmppConnectionService.getAccounts().get(0).getJid().toString());
+                startActivityForResult(intent,REQUEST_CREATE_CONTACT);
+                //showCreateContactDialog(null, null);
                 return true;
-            case R.id.action_join_conference:
-                showJoinConferenceDialog(null);
-                return true;
-            case R.id.action_create_conference:
-                showCreateConferenceDialog();
-                return true;
+//            case R.id.action_join_conference:
+//                showJoinConferenceDialog(null);
+//                return true;
+//            case R.id.action_create_conference:
+//                showCreateConferenceDialog();
+//                return true;
             case R.id.action_scan_qr_code:
-                new IntentIntegrator(this).initiateScan(Arrays.asList("AZTEC","QR_CODE"));
+                //new IntentIntegrator(this).initiateScan(Arrays.asList("AZTEC","QR_CODE"));
                 return true;
             case R.id.action_hide_offline:
                 mHideOfflineContacts = !item.isChecked();
@@ -841,33 +961,31 @@ public class StartConversationActivity extends XmppActivity implements OnRosterU
             return true;
         }
 
-        if (keyCode == KeyEvent.KEYCODE_SEARCH && !event.isLongPress()) {
-            openSearch();
-            return true;
-        }
-        int c = event.getUnicodeChar();
-        if (c > 32) {
-            if (mSearchEditText != null && !mSearchEditText.isFocused()) {
-                openSearch();
-                mSearchEditText.append(Character.toString((char) c));
-                return true;
-            }
-        }
+//        if (keyCode == KeyEvent.KEYCODE_SEARCH && !event.isLongPress()) {
+//            openSearch();
+//            return true;
+//        }
+//        int c = event.getUnicodeChar();
+//        if (c > 32) {
+//            if (mSearchEditText != null && !mSearchEditText.isFocused()) {
+//                openSearch();
+//                mSearchEditText.append(Character.toString((char) c));
+//                return true;
+//            }
+//        }
         return super.onKeyUp(keyCode, event);
     }
 
-    private void openSearch() {
-        if (mMenuSearchView != null) {
-            mMenuSearchView.expandActionView();
-        }
-    }
+//    private void openSearch() {
+//        if (mMenuSearchView != null) {
+//            mMenuSearchView.expandActionView();
+//        }
+//    }
 
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent intent) {
-        if ((requestCode & 0xFFFF) == IntentIntegrator.REQUEST_CODE) {
-            IntentResult scanResult = IntentIntegrator.parseActivityResult(requestCode, resultCode, intent);
-            if (scanResult != null && scanResult.getFormatName() != null) {
-                String data = scanResult.getContents();
+        if(requestCode == REQUEST_CREATE_CONTACT){
+                String data  = intent.getStringExtra("qrCodeValue");
                 Invite invite = new Invite(data);
                 if (xmppConnectionServiceBound) {
                     invite.invite();
@@ -876,8 +994,23 @@ public class StartConversationActivity extends XmppActivity implements OnRosterU
                 } else {
                     this.mPendingInvite = null;
                 }
-            }
-        } else if (resultCode == RESULT_OK) {
+
+        }
+//        if ((requestCode & 0xFFFF) == IntentIntegrator.REQUEST_CODE) {
+//            IntentResult scanResult = IntentIntegrator.parseActivityResult(requestCode, resultCode, intent);
+//            if (scanResult != null && scanResult.getFormatName() != null) {
+//                String data = scanResult.getContents();
+//                Invite invite = new Invite(data);
+//                if (xmppConnectionServiceBound) {
+//                    invite.invite();
+//                } else if (invite.getJid() != null) {
+//                    this.mPendingInvite = invite;
+//                } else {
+//                    this.mPendingInvite = null;
+//                }
+//            }
+//        } else
+        if (resultCode == RESULT_OK) {
             if (xmppConnectionServiceBound) {
                 this.mPostponedActivityResult = null;
                 if (requestCode == REQUEST_CREATE_CONFERENCE) {
@@ -957,6 +1090,8 @@ public class StartConversationActivity extends XmppActivity implements OnRosterU
                 }
             }
     }
+
+
 
     @Override
     protected void onBackendConnected() {
@@ -1078,14 +1213,14 @@ public class StartConversationActivity extends XmppActivity implements OnRosterU
             }
             return true;
         } else {
-            if (mMenuSearchView != null) {
-                mMenuSearchView.expandActionView();
-                mSearchEditText.setText("");
-                mSearchEditText.append(invite.getJid().toString());
-                filter(invite.getJid().toString());
-            } else {
-                mInitialJid = invite.getJid().toString();
-            }
+//            if (mMenuSearchView != null) {
+//                mMenuSearchView.expandActionView();
+//                mSearchEditText.setText("");
+//                mSearchEditText.append(invite.getJid().toString());
+//                filter(invite.getJid().toString());
+//            } else {
+//                mInitialJid = invite.getJid().toString();
+//            }
             return true;
         }
     }
@@ -1350,293 +1485,293 @@ public class StartConversationActivity extends XmppActivity implements OnRosterU
         }
     }
 
-    public class ListPagerAdapter extends PagerAdapter {
-        FragmentManager fragmentManager;
-        MyListFragment[] fragments;
-
-        public ListPagerAdapter(FragmentManager fm) {
-            fragmentManager = fm;
-            fragments = new MyListFragment[2];
-        }
-
-        public void requestFocus(int pos) {
-            if (fragments.length > pos) {
-                fragments[pos].getListView().requestFocus();
-            }
-        }
-
-        @Override
-        public void destroyItem(ViewGroup container, int position, Object object) {
-            assert (0 <= position && position < fragments.length);
-            FragmentTransaction trans = fragmentManager.beginTransaction();
-            trans.remove(fragments[position]);
-            trans.commit();
-            fragments[position] = null;
-        }
-
-        @Override
-        public Fragment instantiateItem(ViewGroup container, int position) {
-            Fragment fragment = getItem(position);
-            FragmentTransaction trans = fragmentManager.beginTransaction();
-            trans.add(container.getId(), fragment, "fragment:" + position);
-            trans.commit();
-            return fragment;
-        }
-
-        @Override
-        public int getCount() {
-            return fragments.length;
-        }
-
-        @Override
-        public boolean isViewFromObject(View view, Object fragment) {
-            return ((Fragment) fragment).getView() == view;
-        }
-
-        public Fragment getItem(int position) {
-            assert (0 <= position && position < fragments.length);
-            if (fragments[position] == null) {
-                final MyListFragment listFragment = new MyListFragment();
-                if (position == 1) {
-                    listFragment.setListAdapter(mConferenceAdapter);
-                    listFragment.setContextMenu(R.menu.conference_context);
-                    listFragment.setOnListItemClickListener(new OnItemClickListener() {
-
-                        @Override
-                        public void onItemClick(AdapterView<?> arg0, View arg1,
-                                                int position, long arg3) {
-                            openConversationForBookmark(position);
-                        }
-                    });
-                } else {
-
-//                    (findViewById(R.id.selected_checkbox)).setOnClickListener(new View.OnClickListener() {
+//    public class ListPagerAdapter extends PagerAdapter {
+//        FragmentManager fragmentManager;
+//        MyListFragment[] fragments;
+//
+//        public ListPagerAdapter(FragmentManager fm) {
+//            fragmentManager = fm;
+//            fragments = new MyListFragment[2];
+//        }
+//
+//        public void requestFocus(int pos) {
+//            if (fragments.length > pos) {
+//                fragments[pos].getListView().requestFocus();
+//            }
+//        }
+//
+//        @Override
+//        public void destroyItem(ViewGroup container, int position, Object object) {
+//            assert (0 <= position && position < fragments.length);
+//            FragmentTransaction trans = fragmentManager.beginTransaction();
+//            trans.remove(fragments[position]);
+//            trans.commit();
+//            fragments[position] = null;
+//        }
+//
+//        @Override
+//        public Fragment instantiateItem(ViewGroup container, int position) {
+//            Fragment fragment = getItem(position);
+//            FragmentTransaction trans = fragmentManager.beginTransaction();
+//            trans.add(container.getId(), fragment, "fragment:" + position);
+//            trans.commit();
+//            return fragment;
+//        }
+//
+//        @Override
+//        public int getCount() {
+//            return fragments.length;
+//        }
+//
+//        @Override
+//        public boolean isViewFromObject(View view, Object fragment) {
+//            return ((Fragment) fragment).getView() == view;
+//        }
+//
+//        public Fragment getItem(int position) {
+//            assert (0 <= position && position < fragments.length);
+//            if (fragments[position] == null) {
+//                final MyListFragment listFragment = new MyListFragment();
+//                if (position == 1) {
+//                    listFragment.setListAdapter(mConferenceAdapter);
+//                    listFragment.setContextMenu(R.menu.conference_context);
+//                    listFragment.setOnListItemClickListener(new OnItemClickListener() {
+//
 //                        @Override
-//                        public void onClick(View view) {
-//                            Log.d("debug","onclickcheckbox");
+//                        public void onItemClick(AdapterView<?> arg0, View arg1,
+//                                                int position, long arg3) {
+//                            openConversationForBookmark(position);
 //                        }
 //                    });
+//                } else {
+//
+////                    (findViewById(R.id.selected_checkbox)).setOnClickListener(new View.OnClickListener() {
+////                        @Override
+////                        public void onClick(View view) {
+////                            Log.d("debug","onclickcheckbox");
+////                        }
+////                    });
+//
+//
+//                    listFragment.setListAdapter(mContactsAdapter);
+//                    listFragment.setContextMenu(R.menu.contact_context);
+//                    listFragment.setOnListItemClickListener(new OnItemClickListener() {
+//
+//                        @Override
+//                        //@TargetApi(Build.VERSION_CODES.LOLLIPOP)
+//                        public void onItemClick(AdapterView<?> arg0, View arg1,
+//                                                int position, long arg3) {
+//
+//                            StringBuilder currentText = new StringBuilder(toContactEditText.getText().toString());
+//                            Spannable spannableText = toContactEditText.getText();
+//                            SpannableStringBuilder spanStringBuilder = new SpannableStringBuilder();
+//                            CheckBox selectorChkbox = (CheckBox)(arg1.findViewById(R.id.selected_checkbox));
+//                            //workaround for making view clickable
+//                            selectorChkbox.setFocusable(false);
+//                            RoundedBackgroundSpan bgSpan = new RoundedBackgroundSpan(StartConversationActivity.this);
+//                            Contact currentContact = (Contact) arg0.getAdapter().getItem(position);
+//                            int indexOfCheckedListItem = clickedViewList.indexOf(arg1);
+//                            boolean hasTypedChars = true;
+//
+//                            if(selectorChkbox.isChecked()){
+//                                if(isHighlighted) {
+//                                    if(indexOfSelectedSpan == indexOfCheckedListItem) {
+//                                        deleteSpan(indexOfSelectedSpan);
+//                                        contactSpanArrayList.remove(indexOfSelectedSpan);
+//                                        indexOfSelectedSpan = -1;
+//                                    }
+//                                    else {
+//                                        deleteSpan(indexOfCheckedListItem,1);
+//                                        contactSpanArrayList.get(indexOfCheckedListItem).setCheckbox(true);
+//                                        contactSpanArrayList.remove(indexOfCheckedListItem);
+//
+//                                        if(indexOfSelectedSpan > indexOfCheckedListItem){
+//                                            indexOfSelectedSpan --;
+//                                        }
+//                                        isHighlighted = true;
+//
+//                                    }
+//                                }else {
+//                                    ((TextView) arg1.findViewById(R.id.contact_display_name)).setTextColor(getPrimaryTextColor());
+//                                    ((TextView) arg1.findViewById(R.id.contact_jid)).setTextColor(getPrimaryTextColor());
+//
+//                                    //get the string to remove from edittext view
+//                                    Jid jidToRemove = ((ListItem) arg0.getAdapter().getItem(position)).getJid();
+//                                    textIsUserInput = false;
+//                                    int indexToRemove = checkIndexFromJid(jidToRemove);
+//                                    deleteSpan(indexToRemove,1);
+//                                    contactSpanArrayList.remove(indexToRemove);
+//                                    indexOfSelectedSpan = -1;
+//                                    toContactEditText.setSelection(toContactEditText.length());
+//                                }
+//
+//                            }
+//                            else {
+//
+//                                if(isHighlighted){
+//                                    deleteSpan(indexOfSelectedSpan);
+//                                    contactSpanArrayList.get(indexOfSelectedSpan).setCheckbox();
+//                                    contactSpanArrayList.remove(indexOfSelectedSpan);
+//                                    indexOfSelectedSpan = -1;
+//                                }
+//
+//                                contactSpanArrayList.add(new ContactSpan(currentContact,arg1,getPrimaryTextColor()));
+//
+//                                if (currentSearchString.length() > 0) {
+//                                    String temp;
+//                                    //Get only the current typed string
+//                                    String newText = currentText.substring(0, currentText.length() - currentSearchString.length());
+//                                    temp = newText;
+//                                    //remove the typed string from edit field
+//                                    toContactEditText.setText(newText);
+//                                    temp = temp + ((ListItem) arg0.getAdapter().getItem(position)).getJid();
+//
+//                                    spanStringBuilder.append(temp);
+//                                    textIsUserInput = false;
+//                                    spanStringBuilder.append(delimiter);
+//                                    populateEdittext(spanStringBuilder.toString());
+//                                    hasTypedChars = true;
+//
+//
+//                                } else {
+//
+//                                    spanStringBuilder.append(((ListItem) arg0.getAdapter().getItem(position)).getDisplayName() + "");
+//                                    populateEdittext(toContactEditText.getText()+spanStringBuilder.toString());
+//                                }
+//
+//
+//
+//                                //selectedContacts.add(((ListItem) arg0.getAdapter().getItem(position)).getJid().toString());
+//
+//
+//                                //clear current search string
+//                                currentSearchString.replace(0, currentSearchString.length(), "");
+//                                spanStringBuilder.replace(0, spanStringBuilder.length(), "");
+//                                //set cursor to the end of edit text
+//                                Log.d("userinput","onclick listfrag before setselection"+textIsUserInput);
+//                                toContactEditText.setSelection(toContactEditText.length());
+//
+//                                Log.d("userinput","onclick listfrag end "+textIsUserInput);
+//
+//                                ((TextView) arg1.findViewById(R.id.contact_display_name)).setTextColor(0xFF3366BB);
+//                                ((TextView) arg1.findViewById(R.id.contact_jid)).setTextColor(0xFF3366BB);
+//                                hideKeyboard();
+//                            }
+//                            selectorChkbox.setChecked(!selectorChkbox.isChecked());
+//
+//                            if(!clickedContactsList.contains(currentContact)) {
+//                                clickedContactsList.add(currentContact);
+//                            }
+//                            if(!clickedViewList.contains(arg1)){
+//                                clickedViewList.add(arg1);
+//                            }
+//                            currentContact.setChecked(!(currentContact.getIsChecked()));
+//
+//                            //mContactsAdapter.notifyDataSetChanged();
+//                            //openConversationForContact(position);
+//
+//                            if(hasTypedChars){
+//                                hasTypedChars = false;
+//                                //Clear the search results
+//                                filterContacts("");
+//                            }
+//                        }
+//                    });
+//                }
+//
+//
+//                fragments[position] = listFragment;
+//            }
+//            return fragments[position];
+//        }
+//    }
 
+//    public static class MyListFragment extends ListFragment {
+//        private AdapterView.OnItemClickListener mOnItemClickListener;
+//        private int mResContextMenu;
+//
+//        public void setContextMenu(final int res) {
+//            this.mResContextMenu = res;
+//        }
+//
+//        @Override
+//        public void onListItemClick(final ListView l, final View v, final int position, final long id) {
+//            if (mOnItemClickListener != null) {
+//                mOnItemClickListener.onItemClick(l, v, position, id);
+//            }
+//        }
+//
+//        public void setOnListItemClickListener(AdapterView.OnItemClickListener l) {
+//            this.mOnItemClickListener = l;
+//        }
+//
+//        @Override
+//        public void onViewCreated(final View view, final Bundle savedInstanceState) {
+//            super.onViewCreated(view, savedInstanceState);
+//            registerForContextMenu(getListView());
+//            getListView().setFastScrollEnabled(true);
+//
+//        }
+//
+//
+//        @Override
+//        public void onCreateContextMenu(final ContextMenu menu, final View v,
+//                                        final ContextMenuInfo menuInfo) {
+//            super.onCreateContextMenu(menu, v, menuInfo);
+//            final StartConversationActivity activity = (StartConversationActivity) getActivity();
+//            activity.getMenuInflater().inflate(mResContextMenu, menu);
+//            final AdapterView.AdapterContextMenuInfo acmi = (AdapterContextMenuInfo) menuInfo;
+//            if (mResContextMenu == R.menu.conference_context) {
+//                activity.conference_context_id = acmi.position;
+//            } else if (mResContextMenu == R.menu.contact_context) {
+//                activity.contact_context_id = acmi.position;
+//                final Contact contact = (Contact) activity.contacts.get(acmi.position);
+//                final MenuItem blockUnblockItem = menu.findItem(R.id.context_contact_block_unblock);
+//                final MenuItem showContactDetailsItem = menu.findItem(R.id.context_contact_details);
+//                if (contact.isSelf()) {
+//                    showContactDetailsItem.setVisible(false);
+//                }
+//                XmppConnection xmpp = contact.getAccount().getXmppConnection();
+//                if (xmpp != null && xmpp.getFeatures().blocking() && !contact.isSelf()) {
+//                    if (contact.isBlocked()) {
+//                        blockUnblockItem.setTitle(R.string.unblock_contact);
+//                    } else {
+//                        blockUnblockItem.setTitle(R.string.block_contact);
+//                    }
+//                } else {
+//                    blockUnblockItem.setVisible(false);
+//                }
+//            }
+//        }
+//
+//        @Override
+//        public boolean onContextItemSelected(final MenuItem item) {
+//            Log.d("debug","onContextItemSelected");
+//            StartConversationActivity activity = (StartConversationActivity) getActivity();
+//            switch (item.getItemId()) {
+//                case R.id.context_start_conversation:
+//                    activity.openConversationForContact();
+//                    break;
+//                case R.id.context_contact_details:
+//                    activity.openDetailsForContact();
+//                    break;
+//                case R.id.context_contact_block_unblock:
+//                    activity.toggleContactBlock();
+//                    break;
+//                case R.id.context_delete_contact:
+//                    activity.deleteContact();
+//                    break;
+//                case R.id.context_join_conference:
+//                    activity.openConversationForBookmark();
+//                    break;
+//                case R.id.context_delete_conference:
+//                    activity.deleteConference();
+//            }
+//            return true;
+//        }
+//    }
 
-                    listFragment.setListAdapter(mContactsAdapter);
-                    listFragment.setContextMenu(R.menu.contact_context);
-                    listFragment.setOnListItemClickListener(new OnItemClickListener() {
-
-                        @Override
-                        //@TargetApi(Build.VERSION_CODES.LOLLIPOP)
-                        public void onItemClick(AdapterView<?> arg0, View arg1,
-                                                int position, long arg3) {
-
-                            StringBuilder currentText = new StringBuilder(toContactEditText.getText().toString());
-                            Spannable spannableText = toContactEditText.getText();
-                            SpannableStringBuilder spanStringBuilder = new SpannableStringBuilder();
-                            CheckBox selectorChkbox = (CheckBox)(arg1.findViewById(R.id.selected_checkbox));
-                            //workaround for making view clickable
-                            selectorChkbox.setFocusable(false);
-                            RoundedBackgroundSpan bgSpan = new RoundedBackgroundSpan(StartConversationActivity.this);
-                            Contact currentContact = (Contact) arg0.getAdapter().getItem(position);
-                            int indexOfCheckedListItem = clickedViewList.indexOf(arg1);
-                            boolean hasTypedChars = true;
-
-                            if(selectorChkbox.isChecked()){
-                                if(isHighlighted) {
-                                    if(indexOfSelectedSpan == indexOfCheckedListItem) {
-                                        deleteSpan(indexOfSelectedSpan);
-                                        contactSpanArrayList.remove(indexOfSelectedSpan);
-                                        indexOfSelectedSpan = -1;
-                                    }
-                                    else {
-                                        deleteSpan(indexOfCheckedListItem,1);
-                                        contactSpanArrayList.get(indexOfCheckedListItem).setCheckbox(true);
-                                        contactSpanArrayList.remove(indexOfCheckedListItem);
-
-                                        if(indexOfSelectedSpan > indexOfCheckedListItem){
-                                            indexOfSelectedSpan --;
-                                        }
-                                        isHighlighted = true;
-
-                                    }
-                                }else {
-                                    ((TextView) arg1.findViewById(R.id.contact_display_name)).setTextColor(getPrimaryTextColor());
-                                    ((TextView) arg1.findViewById(R.id.contact_jid)).setTextColor(getPrimaryTextColor());
-
-                                    //get the string to remove from edittext view
-                                    Jid jidToRemove = ((ListItem) arg0.getAdapter().getItem(position)).getJid();
-                                    textIsUserInput = false;
-                                    int indexToRemove = checkIndexFromJid(jidToRemove);
-                                    deleteSpan(indexToRemove,1);
-                                    contactSpanArrayList.remove(indexToRemove);
-                                    indexOfSelectedSpan = -1;
-                                    toContactEditText.setSelection(toContactEditText.length());
-                                }
-
-                            }
-                            else {
-
-                                if(isHighlighted){
-                                    deleteSpan(indexOfSelectedSpan);
-                                    contactSpanArrayList.get(indexOfSelectedSpan).setCheckbox();
-                                    contactSpanArrayList.remove(indexOfSelectedSpan);
-                                    indexOfSelectedSpan = -1;
-                                }
-
-                                contactSpanArrayList.add(new ContactSpan(currentContact,arg1,getPrimaryTextColor()));
-
-                                if (currentSearchString.length() > 0) {
-                                    String temp;
-                                    //Get only the current typed string
-                                    String newText = currentText.substring(0, currentText.length() - currentSearchString.length());
-                                    temp = newText;
-                                    //remove the typed string from edit field
-                                    toContactEditText.setText(newText);
-                                    temp = temp + ((ListItem) arg0.getAdapter().getItem(position)).getJid();
-
-                                    spanStringBuilder.append(temp);
-                                    textIsUserInput = false;
-                                    spanStringBuilder.append(delimiter);
-                                    populateEdittext(spanStringBuilder.toString());
-                                    hasTypedChars = true;
-
-
-                                } else {
-
-                                    spanStringBuilder.append(((ListItem) arg0.getAdapter().getItem(position)).getDisplayName() + "");
-                                    populateEdittext(toContactEditText.getText()+spanStringBuilder.toString());
-                                }
-
-
-
-                                //selectedContacts.add(((ListItem) arg0.getAdapter().getItem(position)).getJid().toString());
-
-
-                                //clear current search string
-                                currentSearchString.replace(0, currentSearchString.length(), "");
-                                spanStringBuilder.replace(0, spanStringBuilder.length(), "");
-                                //set cursor to the end of edit text
-                                Log.d("userinput","onclick listfrag before setselection"+textIsUserInput);
-                                toContactEditText.setSelection(toContactEditText.length());
-
-                                Log.d("userinput","onclick listfrag end "+textIsUserInput);
-
-                                ((TextView) arg1.findViewById(R.id.contact_display_name)).setTextColor(0xFF3366BB);
-                                ((TextView) arg1.findViewById(R.id.contact_jid)).setTextColor(0xFF3366BB);
-                                hideKeyboard();
-                            }
-                            selectorChkbox.setChecked(!selectorChkbox.isChecked());
-
-                            if(!clickedContactsList.contains(currentContact)) {
-                                clickedContactsList.add(currentContact);
-                            }
-                            if(!clickedViewList.contains(arg1)){
-                                clickedViewList.add(arg1);
-                            }
-                            currentContact.setChecked(!(currentContact.getIsChecked()));
-
-                            //mContactsAdapter.notifyDataSetChanged();
-                            //openConversationForContact(position);
-
-                            if(hasTypedChars){
-                                hasTypedChars = false;
-                                //Clear the search results
-                                filterContacts("");
-                            }
-                        }
-                    });
-                }
-
-
-                fragments[position] = listFragment;
-            }
-            return fragments[position];
-        }
-    }
-
-    public static class MyListFragment extends ListFragment {
-        private AdapterView.OnItemClickListener mOnItemClickListener;
-        private int mResContextMenu;
-
-        public void setContextMenu(final int res) {
-            this.mResContextMenu = res;
-        }
-
-        @Override
-        public void onListItemClick(final ListView l, final View v, final int position, final long id) {
-            if (mOnItemClickListener != null) {
-                mOnItemClickListener.onItemClick(l, v, position, id);
-            }
-        }
-
-        public void setOnListItemClickListener(AdapterView.OnItemClickListener l) {
-            this.mOnItemClickListener = l;
-        }
-
-        @Override
-        public void onViewCreated(final View view, final Bundle savedInstanceState) {
-            super.onViewCreated(view, savedInstanceState);
-            registerForContextMenu(getListView());
-            getListView().setFastScrollEnabled(true);
-
-        }
-
-
-        @Override
-        public void onCreateContextMenu(final ContextMenu menu, final View v,
-                                        final ContextMenuInfo menuInfo) {
-            super.onCreateContextMenu(menu, v, menuInfo);
-            final StartConversationActivity activity = (StartConversationActivity) getActivity();
-            activity.getMenuInflater().inflate(mResContextMenu, menu);
-            final AdapterView.AdapterContextMenuInfo acmi = (AdapterContextMenuInfo) menuInfo;
-            if (mResContextMenu == R.menu.conference_context) {
-                activity.conference_context_id = acmi.position;
-            } else if (mResContextMenu == R.menu.contact_context) {
-                activity.contact_context_id = acmi.position;
-                final Contact contact = (Contact) activity.contacts.get(acmi.position);
-                final MenuItem blockUnblockItem = menu.findItem(R.id.context_contact_block_unblock);
-                final MenuItem showContactDetailsItem = menu.findItem(R.id.context_contact_details);
-                if (contact.isSelf()) {
-                    showContactDetailsItem.setVisible(false);
-                }
-                XmppConnection xmpp = contact.getAccount().getXmppConnection();
-                if (xmpp != null && xmpp.getFeatures().blocking() && !contact.isSelf()) {
-                    if (contact.isBlocked()) {
-                        blockUnblockItem.setTitle(R.string.unblock_contact);
-                    } else {
-                        blockUnblockItem.setTitle(R.string.block_contact);
-                    }
-                } else {
-                    blockUnblockItem.setVisible(false);
-                }
-            }
-        }
-
-        @Override
-        public boolean onContextItemSelected(final MenuItem item) {
-            Log.d("debug","onContextItemSelected");
-            StartConversationActivity activity = (StartConversationActivity) getActivity();
-            switch (item.getItemId()) {
-                case R.id.context_start_conversation:
-                    activity.openConversationForContact();
-                    break;
-                case R.id.context_contact_details:
-                    activity.openDetailsForContact();
-                    break;
-                case R.id.context_contact_block_unblock:
-                    activity.toggleContactBlock();
-                    break;
-                case R.id.context_delete_contact:
-                    activity.deleteContact();
-                    break;
-                case R.id.context_join_conference:
-                    activity.openConversationForBookmark();
-                    break;
-                case R.id.context_delete_conference:
-                    activity.deleteConference();
-            }
-            return true;
-        }
-    }
-
-    private class Invite extends XmppUri {
+    protected class Invite extends XmppUri {
 
         public Invite(final Uri uri) {
             super(uri);

@@ -57,7 +57,7 @@ public class RoundedBackgroundSpan extends ReplacementSpan{
     public void paintText(){
 
         if(!isHighlighted) {
-            this.backgroundColor = context.getResources().getColor(R.color.link_text_material_dark);
+            this.backgroundColor = context.getResources().getColor(R.color.common_google_signin_btn_text_dark_default);
         }
         else {
             this.backgroundColor = white;

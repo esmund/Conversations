@@ -1,0 +1,60 @@
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+                xmlns:tools="http://schemas.android.com/tools"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:paddingBottom="@dimen/activity_vertical_margin"
+                android:paddingLeft="@dimen/activity_horizontal_margin"
+                android:paddingRight="@dimen/activity_horizontal_margin"
+                android:paddingTop="@dimen/activity_vertical_margin"
+                android:layout_weight="1"
+                tools:context="eu.siacs.conversations.ui.CreateContactActivity$PlaceholderFragment">
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="30dp"
+        android:background="@layout/borders"
+        android:orientation="vertical"
+        android:weightSum="1">
+
+        <TextView
+            android:text="Armar Saogo"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:layout_gravity="center"
+            android:layout_above="@+id/account_jid"
+            android:id="@+id/account_name"/>
+
+        <TextView
+            android:text="xzy@domain.com"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:layout_gravity="center"
+            android:layout_above="@+id/qr_code"
+            android:id="@+id/account_jid"/>
+
+    <ImageView
+        android:layout_width="300dp"
+        android:layout_height="300dp"
+        android:src="@drawable/ic_send_picture_online"
+        android:id="@+id/qr_code"
+        android:layout_margin="30dp"
+        android:layout_gravity="center"
+        android:scaleType="center"/>
+
+
+        <TextView
+            android:text="Let other users scan your code"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="20dp"
+            android:layout_gravity="center"
+            android:layout_below="@+id/qr_code"
+            android:id="@+id/additional_information"/>
+    </LinearLayout>
+
+
+</RelativeLayout>

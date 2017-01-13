@@ -13,11 +13,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.google.zxing.integration.android.IntentIntegrator;
-import com.google.zxing.integration.android.IntentResult;
-
 import java.security.cert.X509Certificate;
-import java.util.Arrays;
 
 import eu.siacs.conversations.crypto.axolotl.FingerprintStatus;
 import eu.siacs.conversations.crypto.axolotl.XmppAxolotlSession;
@@ -27,6 +23,10 @@ import eu.siacs.conversations.ui.XmppActivity;
 import eu.siacs.conversations.ui.widget.Switch;
 import eu.siacs.conversations.utils.CryptoHelper;
 import eu.siacs.conversations.utils.XmppUri;
+
+//
+//import com.google.zxing.integration.android.IntentIntegrator;
+//import com.google.zxing.integration.android.IntentResult;
 
 
 public abstract class OmemoActivity extends XmppActivity {
@@ -75,7 +75,7 @@ public abstract class OmemoActivity extends XmppActivity {
                 copyOmemoFingerprint(mSelectedFingerprint);
                 break;
             case R.id.verify_scan:
-                new IntentIntegrator(this).initiateScan(Arrays.asList("AZTEC","QR_CODE"));
+                //new IntentIntegrator(this).initiateScan(Arrays.asList("AZTEC","QR_CODE"));
                 break;
         }
         return true;
@@ -83,16 +83,16 @@ public abstract class OmemoActivity extends XmppActivity {
 
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent intent) {
-        IntentResult scanResult = IntentIntegrator.parseActivityResult(requestCode, resultCode, intent);
-        if (scanResult != null && scanResult.getFormatName() != null) {
-            String data = scanResult.getContents();
-            XmppUri uri = new XmppUri(data);
-            if (xmppConnectionServiceBound) {
-                processFingerprintVerification(uri);
-            } else {
-                this.mPendingFingerprintVerificationUri =uri;
-            }
-        }
+//        IntentResult scanResult = IntentIntegrator.parseActivityResult(requestCode, resultCode, intent);
+//        if (scanResult != null && scanResult.getFormatName() != null) {
+//            String data = scanResult.getContents();
+//            XmppUri uri = new XmppUri(data);
+//            if (xmppConnectionServiceBound) {
+//                processFingerprintVerification(uri);
+//            } else {
+//                this.mPendingFingerprintVerificationUri =uri;
+//            }
+//        }
     }
 
     protected abstract void processFingerprintVerification(XmppUri uri);
