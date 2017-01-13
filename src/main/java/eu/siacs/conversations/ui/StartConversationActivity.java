@@ -36,6 +36,7 @@ import android.text.style.StyleSpan;
 import android.text.style.TypefaceSpan;
 import android.util.Log;
 import android.util.Pair;
+import android.view.ContextMenu;
 import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -76,6 +77,7 @@ import eu.siacs.conversations.ui.adapter.KnownHostsAdapter;
 import eu.siacs.conversations.ui.adapter.ListItemAdapter;
 import eu.siacs.conversations.utils.XmppUri;
 import eu.siacs.conversations.xmpp.OnUpdateBlocklist;
+import eu.siacs.conversations.xmpp.XmppConnection;
 import eu.siacs.conversations.xmpp.jid.InvalidJidException;
 import eu.siacs.conversations.xmpp.jid.Jid;
 
@@ -396,7 +398,9 @@ public class StartConversationActivity extends XmppActivity implements OnRosterU
         contactListView = (ListView) findViewById(R.id.start_conversation_list_view);
 
         contactListView.setAdapter(mContactsAdapter);
-        //contactListView.setContextMenu(R.menu.contact_context);
+
+        registerForContextMenu(contactListView);
+
         contactListView.setOnItemClickListener(new OnItemClickListener() {
 
             @Override
@@ -1304,23 +1308,19 @@ public class StartConversationActivity extends XmppActivity implements OnRosterU
             }
         }
         Collections.sort(this.conferences);
-        //mConferenceAdapter.notifyDataSetChanged();
     }
 
     private int checkSpanIndexFromText(Spannable spannable,Object o){
         RoundedBackgroundSpan[] bgSpan = spannable.getSpans(0,spannable.length(),RoundedBackgroundSpan.class);
         for(int i = 0; i < bgSpan.length; i++){
             if(bgSpan[i].getSpanStart() == spannable.getSpanStart(o) && bgSpan[i].getSpanEnd() == spannable.getSpanEnd(o)){
-                Log.d("debug","Span found at index "+i);
                 return i;
             }
         }
-        Log.d("debug","no span found with "+spannable.toString());
         return 0;
     }
 
     private int checkIndexFromJid(Jid jid){
-        Log.d("debug","jid to detect"+jid);
 
         for(int i = 0; i < contactSpanArrayList.size(); i++){
             if(contactSpanArrayList.get(i).getJid().equals(jid)){
@@ -1443,10 +1443,8 @@ public class StartConversationActivity extends XmppActivity implements OnRosterU
         toContactEditText.overrideDel = false;
 
         spanArrayList.remove(spanToDel);
-        Log.d("spanarray","spanarray in deletespan "+spanArrayList.size());
         clickedViewList.remove(spanToDel);
         clickedContactsList.remove(spanToDel);
-        Log.d("spanarray","span deleted "+spanToDel);
     }
 
     private void deleteSpan (int spanToDel,int delChars){
@@ -1463,15 +1461,13 @@ public class StartConversationActivity extends XmppActivity implements OnRosterU
         toContactEditText.overrideDel = false;
 
         spanArrayList.remove(spanToDel);
-        Log.d("spanarray","spanarray in deletespan "+spanArrayList.size());
         clickedViewList.remove(spanToDel);
         clickedContactsList.remove(spanToDel);
-        Log.d("spanarray","span deleted "+spanToDel);
     }
 
-    private void onTabChanged() {
-        invalidateOptionsMenu();
-    }
+//    private void onTabChanged() {
+//        invalidateOptionsMenu();
+//    }
 
     @Override
     public void OnUpdateBlocklist(final Status status) {
@@ -1714,62 +1710,55 @@ public class StartConversationActivity extends XmppActivity implements OnRosterU
 //        }
 //
 //
-//        @Override
-//        public void onCreateContextMenu(final ContextMenu menu, final View v,
-//                                        final ContextMenuInfo menuInfo) {
-//            super.onCreateContextMenu(menu, v, menuInfo);
-//            final StartConversationActivity activity = (StartConversationActivity) getActivity();
-//            activity.getMenuInflater().inflate(mResContextMenu, menu);
-//            final AdapterView.AdapterContextMenuInfo acmi = (AdapterContextMenuInfo) menuInfo;
-//            if (mResContextMenu == R.menu.conference_context) {
-//                activity.conference_context_id = acmi.position;
-//            } else if (mResContextMenu == R.menu.contact_context) {
-//                activity.contact_context_id = acmi.position;
-//                final Contact contact = (Contact) activity.contacts.get(acmi.position);
-//                final MenuItem blockUnblockItem = menu.findItem(R.id.context_contact_block_unblock);
-//                final MenuItem showContactDetailsItem = menu.findItem(R.id.context_contact_details);
-//                if (contact.isSelf()) {
-//                    showContactDetailsItem.setVisible(false);
-//                }
-//                XmppConnection xmpp = contact.getAccount().getXmppConnection();
-//                if (xmpp != null && xmpp.getFeatures().blocking() && !contact.isSelf()) {
-//                    if (contact.isBlocked()) {
-//                        blockUnblockItem.setTitle(R.string.unblock_contact);
-//                    } else {
-//                        blockUnblockItem.setTitle(R.string.block_contact);
-//                    }
-//                } else {
-//                    blockUnblockItem.setVisible(false);
-//                }
-//            }
-//        }
-//
-//        @Override
-//        public boolean onContextItemSelected(final MenuItem item) {
-//            Log.d("debug","onContextItemSelected");
-//            StartConversationActivity activity = (StartConversationActivity) getActivity();
-//            switch (item.getItemId()) {
-//                case R.id.context_start_conversation:
-//                    activity.openConversationForContact();
-//                    break;
-//                case R.id.context_contact_details:
-//                    activity.openDetailsForContact();
-//                    break;
-//                case R.id.context_contact_block_unblock:
-//                    activity.toggleContactBlock();
-//                    break;
-//                case R.id.context_delete_contact:
-//                    activity.deleteContact();
-//                    break;
-//                case R.id.context_join_conference:
-//                    activity.openConversationForBookmark();
-//                    break;
-//                case R.id.context_delete_conference:
-//                    activity.deleteConference();
-//            }
-//            return true;
-//        }
-//    }
+        @Override
+        public void onCreateContextMenu(final ContextMenu menu, final View v,
+                                        final ContextMenu.ContextMenuInfo menuInfo) {
+            super.onCreateContextMenu(menu, v, menuInfo);
+            getMenuInflater().inflate(R.menu.contact_context, menu);
+            final AdapterView.AdapterContextMenuInfo acmi = (AdapterView.AdapterContextMenuInfo) menuInfo;
+                contact_context_id = acmi.position;
+                final Contact contact = (Contact) contacts.get(acmi.position);
+                final MenuItem blockUnblockItem = menu.findItem(R.id.context_contact_block_unblock);
+                final MenuItem showContactDetailsItem = menu.findItem(R.id.context_contact_details);
+                if (contact.isSelf()) {
+                    showContactDetailsItem.setVisible(false);
+                }
+                XmppConnection xmpp = contact.getAccount().getXmppConnection();
+                if (xmpp != null && xmpp.getFeatures().blocking() && !contact.isSelf()) {
+                    if (contact.isBlocked()) {
+                        blockUnblockItem.setTitle(R.string.unblock_contact);
+                    } else {
+                        blockUnblockItem.setTitle(R.string.block_contact);
+                    }
+                } else {
+                    blockUnblockItem.setVisible(false);
+                }
+
+        }
+        @Override
+        public boolean onContextItemSelected(final MenuItem item) {
+            switch (item.getItemId()) {
+                case R.id.context_start_conversation:
+                    openConversationForContact();
+                    break;
+                case R.id.context_contact_details:
+                    openDetailsForContact();
+                    break;
+                case R.id.context_contact_block_unblock:
+                    toggleContactBlock();
+                    break;
+                case R.id.context_delete_contact:
+                    deleteContact();
+                    break;
+                case R.id.context_join_conference:
+                    openConversationForBookmark();
+                    break;
+                case R.id.context_delete_conference:
+                    deleteConference();
+            }
+            return true;
+        }
+
 
     protected class Invite extends XmppUri {
 
