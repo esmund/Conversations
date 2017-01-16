@@ -81,15 +81,6 @@ public class BarcodePreviewFragment extends Fragment {
         // Required empty public constructor
     }
 
-    /**
-     * Use this factory method to create a new instance of
-     * this fragment using the provided parameters.
-     *
-     * @param param1 Parameter 1.
-     * @param param2 Parameter 2.
-     * @return A new instance of fragment BarcodePreviewFragment.
-     */
-    // TODO: Rename and change types and number of parameters
     public static BarcodePreviewFragment newInstance(String param1, String param2) {
         BarcodePreviewFragment fragment = new BarcodePreviewFragment();
         Bundle args = new Bundle();
@@ -299,15 +290,10 @@ public class BarcodePreviewFragment extends Fragment {
             public void onFound(String barcodeValue) {
                 Log.d("debug","barcode found:"+barcodeValue);
                 if(mPreview != null && isStarted) {
-//                    Intent createContactIntent = new Intent(getContext(),StartConversationActivity.class);
-//                    createContactIntent.putExtra("qrCode",barcodeValue);
-//                    startActivity(createContactIntent);
                     final Intent data = new Intent();
                     data.putExtra("qrCodeValue", barcodeValue);
                     getActivity().setResult(RESULT_OK,data);
                     getActivity().finish();
-
-                    //((CreateContactActivity)getActivity()).createContactFromQR(barcodeValue);
                 }
             }
         });

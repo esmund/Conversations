@@ -7,7 +7,6 @@ import android.app.ActionBar;
 import android.app.ActionBar.Tab;
 import android.app.AlertDialog;
 import android.app.Dialog;
-import android.app.Fragment;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -117,7 +116,6 @@ public class StartConversationActivity extends XmppActivity implements OnRosterU
     private ArrayList<Contact> clickedContactsList = new ArrayList();
     private ArrayList<View> clickedViewList = new ArrayList<>();
     private ArrayList<ContactSpan> contactSpanArrayList = new ArrayList<>();
-    private Fragment convoFrag;
     private char lastDelChar;
     private int indexOfSelectedSpan = -1;
 
@@ -992,7 +990,9 @@ public class StartConversationActivity extends XmppActivity implements OnRosterU
                 String data  = intent.getStringExtra("qrCodeValue");
                 Invite invite = new Invite(data);
                 if (xmppConnectionServiceBound) {
-                    invite.invite();
+                    if(!invite.invite()){
+                        Toast.makeText(this,"Invalid ID",Toast.LENGTH_SHORT).show();
+                    }
                 } else if (invite.getJid() != null) {
                     this.mPendingInvite = invite;
                 } else {
